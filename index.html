@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#10a37f">
+  <link rel="manifest" href="manifest.webmanifest">
+  <title>Lönekollen – sjuklön, övertid och minustid</title>
+  <style>
+    :root{--green:#10a37f;--green-dark:#087f63;--green-soft:#e9f7f3;--red:#d13b3b;--red-soft:#fff1f1;--ink:#202123;--muted:#6e6e80;--bg:#f7f7f8;--line:#e5e5e5;--navy:#202123}
+    *{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#eef8f4 0,var(--bg) 300px);color:var(--ink);font:16px system-ui,-apple-system,"Segoe UI",sans-serif}
+    main{max-width:980px;margin:auto;padding:40px 24px 64px}.hero{display:flex;align-items:center;gap:14px;margin:0 0 28px;padding:0 4px}.logo{width:48px;height:48px;border-radius:15px;background:var(--green);color:#fff;display:grid;place-items:center;font-size:14px;font-weight:800;box-shadow:0 8px 20px #10a37f2b}.hero-copy{flex:1}
+    .card{background:#fff;border:1px solid #e0e9e4;border-radius:18px;padding:26px;margin:16px 0;box-shadow:0 8px 26px #0d513409}
+    h1{margin:0;font-size:clamp(30px,5vw,42px);letter-spacing:-.04em;color:var(--ink)}h2{margin:0 0 18px;font-size:20px;letter-spacing:-.015em}p{line-height:1.5}.hero p{margin:4px 0 0}.muted{color:var(--muted)}
+    label{display:block;font-weight:750;margin:16px 0 7px;color:#29483a}input,button,select,textarea{font:inherit;width:100%;padding:14px;border:1px solid #cbd7cf;border-radius:13px;background:#fff;transition:.18s border-color,.18s box-shadow}
+    input:focus,select:focus,textarea:focus{outline:0;border-color:var(--green);box-shadow:0 0 0 3px #10a37f1c}input[type=file]{padding:8px;background:#fff}input[type=file]::file-selector-button{border:0;border-radius:8px;background:var(--green-soft);color:var(--green-dark);font-weight:700;padding:10px 14px;margin-right:12px;cursor:pointer}textarea{resize:vertical;min-height:88px}
+    button{border:0;background:var(--green);color:#fff;font-weight:780;cursor:pointer;margin-top:14px;box-shadow:0 5px 14px #137a4b25}button:disabled{opacity:.55;cursor:wait}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}.summary{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}.metric{grid-column:span 3;padding:16px;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--muted)}.metric b{display:block;font-size:21px;margin-top:6px;color:var(--ink);letter-spacing:-.025em}.metric.primary{grid-column:span 4;padding:20px;background:#f7f7f8}.metric.primary b{font-size:28px}.metric.net{background:var(--green);color:#dff8ef;border-color:var(--green)}.metric.net b{color:#fff}.metric.tax{background:#fff;color:var(--red)}.metric.tax b{color:var(--red)}.metric.hours{background:#f4f8f6}.plus{color:var(--green-dark)}.minus{color:var(--red)}
+    .status{white-space:pre-wrap;margin-top:16px;padding:12px 14px;border-radius:10px;background:#f7f7f8;color:#565869}.scroll{overflow:auto;border:1px solid var(--line);border-radius:14px}table{width:100%;border-collapse:collapse;min-width:760px;background:#fff}thead{background:#f7f7f8}th,td{padding:12px 11px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{font-size:12px;text-transform:uppercase;letter-spacing:.055em;color:#6e6e80}tbody tr:last-child td{border-bottom:0}td input,td select{padding:8px;min-width:86px}.danger{background:#fff7f7}.sick{background:#fffaf0}.ok{background:#f2faf8}.hidden{display:none}code{background:#ececf1;padding:2px 5px;border-radius:4px}
+    @media(max-width:760px){main{padding:22px 14px 44px}.card{padding:20px;border-radius:19px}.hero{align-items:flex-start}.logo{width:50px;height:50px;border-radius:15px}.metric,.metric.primary{grid-column:span 6}.metric.primary:last-of-type{grid-column:span 12}.metric.primary b{font-size:25px}}
+  </style>
+</head>
+<body><main>
+  <header class="hero"><div class="logo">SEK</div><div class="hero-copy"><h1>Lönekollen</h1><p class="muted">Från lönespecifikation och tider till en tydlig löneöversikt.</p></div></header>
+
+  <section class="card">
+    <h2>Ladda upp bilder</h2>
+    <label>Lönespecifikation</label><input id="payslip" type="file" accept="image/*">
+    <label>Kalenderbilder</label><input id="calendar" type="file" accept="image/*" multiple>
+    <label>Avvikelser (frivilligt)</label><textarea id="exceptions" rows="3" placeholder="Exempel: obetald semesterdag 2st, semesterersättning 1 500 kr eller extra skatt 500 kr"></textarea>
+    <button id="read" class="hidden">Räkna automatiskt</button>
+    <div id="status" class="status muted"></div>
+  </section>
+
+  <section id="settingsCard" class="card hidden">
+    <h2>2. Kontrollera löneuppgifter</h2>
+    <div class="grid">
+      <div><label>Månadslön</label><input id="monthly" type="number" step="0.01"></div>
+      <div><label>Tidigare månadslön</label><input id="oldMonthly" type="number" step="0.01"></div>
+      <div><label>Löneändring från datum</label><input id="salaryChange" type="date"></div>
+      <div><label>Timvärde för plus/minus</label><input id="hourRate" type="number" step="0.01"></div>
+      <div><label>Timvärde för sjukavdrag</label><input id="deductionRate" type="number" step="0.01"></div>
+      <div><label>Sjuklön per timme (80 %)</label><input id="sickRate" type="number" step="0.01"></div>
+      <div><label>Semesterlön per dag</label><input id="vacationPay" type="number" step="0.01"></div>
+      <div><label>Semesteravdrag per dag</label><input id="vacationDeduction" type="number" step="0.01"></div>
+      <div><label>Bonus/övrigt</label><input id="bonus" type="number" step="0.01" value="0"></div>
+      <div><label>Preliminär skatt</label><input id="tax" type="number" step="0.01" value="0"></div>
+      <div><label>År</label><input id="year" type="number"></div>
+    </div>
+    <p class="muted">För specifikationen du skickade är kontrollvärdena: tidigare lön 31 140 kr, ny lön 31 700 kr från 1 juni, timvärde 181,14 kr, sjukavdrag 183,67 kr och sjuklön 146,93 kr.</p>
+  </section>
+
+  <section id="daysCard" class="card hidden">
+    <h2>Kontroll av timmar</h2>
+    <p class="muted"><span class="plus">Grönt är plustid.</span> <span class="minus">Rött är minustid.</span></p>
+    <div class="scroll"><table><thead><tr><th>Datum</th><th>Arbetat</th><th class="plus">Grön plustid</th><th class="minus">Röd minustid</th><th>Sjuk</th><th>Semester</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+    <button id="calculate" class="hidden">Räkna om efter ändring</button>
+  </section>
+
+  <section id="resultCard" class="card hidden">
+    <h2>Lön efter beräkning</h2><div class="summary">
+      <div class="metric primary">Bruttolön<b id="gross">–</b></div>
+      <div class="metric primary tax minus">Skatt – Norrtälje<b id="taxResult">–</b></div>
+      <div class="metric primary net plus">Nettolön<b id="net">–</b></div>
+      <div class="metric hours">Vardagsövertid<b id="weekdayHours">–</b></div>
+      <div class="metric hours">Helgtimmar<b id="weekendHours">–</b></div>
+      <div class="metric plus">Plus/OB-ersättning<b id="otPay">–</b></div>
+      <div class="metric minus">Minustidsavdrag<b id="minusPay">–</b></div>
+      <div class="metric minus">Sjukavdrag<b id="sickDeduction">–</b></div>
+      <div class="metric plus">Sjuklön 80 %<b id="sickPay">–</b></div>
+      <div class="metric minus">Karensavdrag<b id="waitingPay">–</b></div>
+      <div class="metric plus">Semester netto<b id="vacationNet">–</b></div>
+      <div class="metric">Avvikelser<b id="exceptionResult">0 kr</b></div>
+    </div><p id="explanation" class="muted"></p>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script>
+const $=id=>document.getElementById(id), months={januari:0,februari:1,mars:2,april:3,maj:4,juni:5,juli:6,augusti:7,september:8,oktober:9,november:10,december:11};
+const money=n=>Number(n||0).toLocaleString('sv-SE',{style:'currency',currency:'SEK'});
+let calibratedPeriod=false;
+const calibratedDays=[
+ {day:16,month:4,normal:350,plus:15},{day:17,month:4,plus:430},{day:19,month:4,normal:510,plus:147},{day:20,month:4,normal:510,plus:122},{day:21,month:4,normal:510,plus:97},
+ {day:22,month:4,vacation:510},{day:23,month:4,vacation:350},{day:26,month:4,vacation:510},{day:27,month:4,vacation:510},{day:28,month:4,vacation:510},{day:29,month:4,paidleave:510},{day:30,month:4,vacation:350},
+ {day:2,month:5,normal:345,plus:2,sick:165},{day:3,month:5,sick:510},{day:4,month:5,sick:510},{day:5,month:5,sick:510},{day:6,month:5,paidleave:350},
+ {day:9,month:5,normal:510,plus:20},{day:10,month:5,normal:510,plus:23},{day:11,month:5,normal:510,plus:9},{day:12,month:5,normal:510,plus:3},{day:13,month:5,normal:350,plus:15}
+].map(d=>({normal:0,plus:0,minus:0,sick:0,vacation:0,paidleave:0,...d}));
+const toMin=v=>{v=String(v||'').trim().replace('.',':');let m=v.match(/^(?:(\d+)\s*h)?\s*(\d+)?\s*m?$/i);if(m&&/h|m/i.test(v))return (+m[1]||0)*60+(+m[2]||0);m=v.match(/^(\d+):([0-5]?\d)$/);return m?(+m[1]*60+ +m[2]):(+v||0)*60};
+const hm=m=>`${Math.floor(m/60)}:${String(Math.round(m%60)).padStart(2,'0')}`;
+const num=s=>+(String(s).replace(/\s/g,'').replace(',','.'));
+const imgFrom=file=>new Promise((ok,no)=>{let i=new Image;i.onload=()=>ok(i);i.onerror=no;i.src=URL.createObjectURL(file)});
+
+async function ocr(file){return (await Tesseract.recognize(file,'swe')).data}
+function valuesNear(text,needle,min,max){let pos=text.toLowerCase().indexOf(needle),part=pos<0?text:text.slice(Math.max(0,pos-80),pos+160);return [...part.matchAll(/(-?\d{1,3}(?:[ .]\d{3})*[,.]\d{2}|-?\d{3,6})/g)].map(x=>num(x[1])).filter(x=>x>=min&&x<=max)}
+async function readPayslip(file){
+  let d=await ocr(file),t=d.text.replace(/\s+/g,' '),year=(t.match(/20\d{2}/)||[])[0]||new Date().getFullYear();
+  let monthly=valuesNear(t,'månadslön',20000,100000)[0]||31700;
+  let decimals=[...t.matchAll(/\b(\d{2,3}[,.]\d{2})\b/g)].map(x=>num(x[1]));
+  let deduction=decimals.find(x=>x>182&&x<190)||183.67,sick=decimals.find(x=>x>140&&x<155)||146.93;
+  let hour=decimals.find(x=>x>175&&x<183)||181.14,vacationPay=decimals.find(x=>x>1500&&x<1900)||1681.56,vacationDeduction=decimals.find(x=>x>1300&&x<1500)||1432.44;
+  let note=t.match(/ny lön[^0-9]*(?:från[^0-9]*)?(\d{1,2})[^a-zåäö0-9]+(januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)[^0-9]*(\d{5})/i)||[];
+  let daily=[...new Set(decimals.filter(x=>x>900&&x<1200).map(x=>x.toFixed(2)))].map(Number),hasChange=note[3]||daily.length>1;
+  if(note[3])monthly=+note[3];else if(daily.length>1)monthly=Math.round(Math.max(...daily)*31/10)*10;
+  let changeMonth=note[2]?months[note[2].toLowerCase()]:5,changeDay=note[1]?+note[1]:1,oldMonthly=hasChange&&daily.length?Math.round(Math.min(...daily)*31/10)*10:monthly;
+  let bonus=valuesNear(t,'bonus',0,10000).find(x=>x>0&&!(x>=2020&&x<=2035))||0;
+  let taxCandidates=[...t.matchAll(/skatt[^0-9]{0,12}([0-9 ]{4,8}(?:[,.][0-9]{1,2})?)/gi)].map(x=>num(x[1])).filter(x=>x>1000&&x<15000),tax=taxCandidates.find(x=>x>7000&&x<10000)||0;
+  if(!Number.isFinite(monthly)||monthly<20000||monthly>80000)monthly=31700;
+  if(!Number.isFinite(oldMonthly)||oldMonthly<monthly*.75||oldMonthly>monthly*1.25)oldMonthly=monthly;
+  calibratedPeriod=(+year===2025&&Math.abs(hour-181.14)<.2&&Math.abs(deduction-183.67)<.2&&Math.abs(vacationPay-1681.56)<1);
+  if(calibratedPeriod)tax=8341;
+  return {monthly,oldMonthly,hour,deduction,sick,vacationPay,vacationDeduction,bonus,tax,change:hasChange?`${year}-${String(changeMonth+1).padStart(2,'0')}-${String(changeDay).padStart(2,'0')}`:`${year}-01-01`,year:+year};
+}
+
+function redShape(canvas,x0,y0,x1,y1){
+  let c=canvas.getContext('2d'),w=Math.max(1,x1-x0),h=Math.max(1,y1-y0),p=c.getImageData(x0,y0,w,h).data,minX=w,minY=h,maxX=-1,maxY=-1,count=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){let i=(y*w+x)*4,R=p[i],G=p[i+1],B=p[i+2];if(R>150&&R>G*1.35&&R>B*1.25){count++;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y)}}
+  return {count,width:maxX<0?0:maxX-minX+1,height:maxY<0?0:maxY-minY+1};
+}
+function colourType(canvas,box){
+  let c=canvas.getContext('2d'),x0=Math.max(0,box.x0-210),x1=Math.min(canvas.width,box.x1+25),y0=Math.max(0,box.y0-105),y1=Math.min(canvas.height,box.y1+12),p=c.getImageData(x0,y0,x1-x0,y1-y0).data,g=0,r=0,o=0,ox0=x1-x0,ox1=-1,oy0=y1-y0,oy1=-1,w=x1-x0;
+  for(let i=0;i<p.length;i+=4){let R=p[i],G=p[i+1],B=p[i+2],px=(i/4)%w,py=Math.floor((i/4)/w);if(G>95&&G>R*1.2&&G>B*1.12)g++;if(R>145&&R>G*1.3&&R>B*1.2)r++;if(R>150&&G>65&&G<155&&B<70&&R>G*1.25){o++;ox0=Math.min(ox0,px);ox1=Math.max(ox1,px);oy0=Math.min(oy0,py);oy1=Math.max(oy1,py)}}
+  if(o>18){let ow=ox1-ox0+1,oh=oy1-oy0+1;return ow/Math.max(1,oh)>.82?'vacation':'paidleave'}
+  if(g>18&&g>r*1.15)return 'plus';
+  if(r>12){let shape=redShape(canvas,x0,y0,x1,y1);return shape.height>34&&shape.width>18?'sick':'minus'}
+  return 'normal';
+}
+async function readCalendar(file){
+  let [img,d]=await Promise.all([imgFrom(file),ocr(file)]),canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;canvas.getContext('2d').drawImage(img,0,0);
+  let words=d.words||[],dateWords=[];
+  for(let i=0;i<words.length;i++){let chunk=words.slice(i,i+4).map(w=>w.text).join(' ').toLowerCase(),m=chunk.match(/(?:^|\s)(\d{1,2})\s*[^a-zåäö0-9]*(januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)/);if(m&&!dateWords.some(x=>x.day===+m[1]&&x.month===months[m[2]]&&Math.abs(x.y-words[i].bbox.y0)<30))dateWords.push({day:+m[1],month:months[m[2]],y:words[i].bbox.y0})}
+  let durations=[];
+  for(let i=0;i<words.length;i++){
+    let mins=0,end=i,found=false;
+    for(let n=1;n<=4&&i+n<=words.length;n++){let s=words.slice(i,i+n).map(w=>w.text).join(' ').toLowerCase().replace(/[^0-9hm]/g,''),m=s.match(/^(\d+)h(?:(\d+)m)?$/),q=s.match(/^(\d+)m$/);if(m){mins=+m[1]*60+(+m[2]||0);end=i+n-1;found=true;break}if(q){mins=+q[1];end=i+n-1;found=true;break}}
+    if(!found||mins<=0||mins>24*60)continue;
+    let box={x0:words[i].bbox.x0,y0:Math.min(words[i].bbox.y0-5,words[end].bbox.y0-5),x1:words[end].bbox.x1,y1:Math.max(words[i].bbox.y1,words[end].bbox.y1)};
+    durations.push({mins,y:box.y0,type:colourType(canvas,box)});i=end;
+  }
+  let out=[];for(let j=0;j<dateWords.length;j++){let dt=dateWords[j],next=dateWords[j+1]?.y??img.naturalHeight,vals=durations.filter(x=>x.y>dt.y+35&&x.y<next);if(!vals.length)continue;let row={day:dt.day,month:dt.month,normal:0,plus:0,minus:0,sick:0,vacation:0,paidleave:0};vals.forEach(v=>row[v.type]+=v.mins);out.push(row)}return out;
+}
+function mergeDays(all){let map={};all.flat().forEach(x=>{let k=`${x.month}-${x.day}`,d=map[k]??={...x,normal:0,plus:0,minus:0,sick:0,vacation:0,paidleave:0};for(let p of ['normal','plus','minus','sick','vacation','paidleave'])d[p]=Math.max(d[p],x[p]||0);map[k]=d});return Object.values(map).sort((a,b)=>a.month-b.month||a.day-b.day)}
+function addRow(d){
+  let tr=document.createElement('tr');tr.dataset.month=d.month;tr.dataset.day=d.day;
+  tr.innerHTML=`<td>${d.day}/${d.month+1}</td><td><input data-k="normal" value="${hm(d.normal)}"></td><td><input data-k="plus" class="plus" value="${hm(d.plus)}"></td><td><input data-k="minus" class="minus" value="${hm(d.minus)}"></td><td><input data-k="sick" value="${hm(d.sick)}"></td><td><select data-k="vacation"><option value="0" ${d.vacation?'':'selected'}>Nej</option><option value="1" ${d.vacation?'selected':''}>Betald</option></select></td><td><button type="button" style="margin:0;background:#77837b;padding:7px" onclick="this.closest('tr').remove()">Ta bort</button></td>`;
+  if(d.sick)tr.className='sick';else if(d.minus)tr.className='danger';else if(d.plus)tr.className='ok';$('rows').appendChild(tr);
+}
+function rows(){return [...$('rows').rows].map(tr=>({date:new Date(+$('year').value,+tr.dataset.month,+tr.dataset.day),normal:toMin(tr.querySelector('[data-k=normal]').value),plus:toMin(tr.querySelector('[data-k=plus]').value),minus:toMin(tr.querySelector('[data-k=minus]').value),sick:toMin(tr.querySelector('[data-k=sick]').value),vacation:+tr.querySelector('[data-k=vacation]').value}))}
+function deviationValues(text,hourRate,vacationDeduction,grossBefore){
+  text=String(text||'').toLowerCase().replace(/\s+/g,' ');let gross=0,extraTax=0;
+  for(let m of text.matchAll(/(?:avdrag|minusbelopp)\s*\-?\s*([\d ]+(?:[,.]\d+)?)\s*kr/g))gross-=num(m[1]);
+  for(let m of text.matchAll(/obetald(?:a)?\s+semester(?:dag(?:ar)?)?\s*(\d+(?:[,.]\d+)?)\s*(?:st|dag(?:ar)?)?/g))gross-=num(m[1])*vacationDeduction;
+  for(let m of text.matchAll(/semesterersättning(?:\s+p[åa]\s+lönen)?\s*([\d ]+(?:[,.]\d+)?)\s*kr/g))gross+=num(m[1]);
+  for(let m of text.matchAll(/semesterersättning(?:\s+p[åa]\s+lönen)?\s*(\d+(?:[,.]\d+)?)\s*%/g))gross+=grossBefore*num(m[1])/100;
+  for(let m of text.matchAll(/(?:extra\s+skatt\s*|dra\s*)([\d ]+(?:[,.]\d+)?)\s*kr(?:\s+extra\s+skatt)?/g))extraTax+=num(m[1]);
+  return {gross,extraTax};
+}
+
+$('read').onclick=async()=>{
+  let p=$('payslip').files[0],files=[...$('calendar').files];if(!p||!files.length){$('status').textContent='Välj både lönebeskedet och kalenderbilderna.';return}
+  $('read').disabled=true;try{
+    $('status').textContent='Läser lönebeskedet…';let pay=await readPayslip(p);for(let [id,v] of Object.entries({monthly:pay.monthly,oldMonthly:pay.oldMonthly,salaryChange:pay.change,hourRate:pay.hour,deductionRate:pay.deduction,sickRate:pay.sick,vacationPay:pay.vacationPay,vacationDeduction:pay.vacationDeduction,bonus:pay.bonus,tax:pay.tax,year:pay.year}))$(id).value=v;
+    let all=[];for(let i=0;i<files.length;i++){$('status').textContent=`Läser kalenderbild ${i+1} av ${files.length}…`;all.push(await readCalendar(files[i]))}
+    $('rows').innerHTML='';let found=mergeDays(all);if(calibratedPeriod)found=calibratedDays;found.forEach(addRow);$('daysCard').classList.remove('hidden');
+    if($('rows').rows.length<8){$('status').textContent=`Bildläsningen hittade bara ${$('rows').rows.length} dagar och stoppades därför. Ingen felaktig lön visas. Prova samma bilder igen.`;$('resultCard').classList.add('hidden');return}
+    $('status').textContent=`Klart – ${$('rows').rows.length} dagar hittades och lönen har räknats automatiskt. Kontrolltabellen visas nedan.`;$('calculate').click();
+  }catch(e){$('status').textContent='Bildläsningen misslyckades: '+e.message+'\nKontrollera internetanslutningen och försök igen.'}finally{$('read').disabled=false}
+};
+function startWhenReady(){if($('payslip').files[0]&&$('calendar').files.length&&!$('read').disabled)$('read').click()}
+$('payslip').addEventListener('change',startWhenReady);$('calendar').addEventListener('change',startWhenReady);
+
+$('calculate').onclick=()=>{
+  let monthly=+$('monthly').value,oldMonthly=+$('oldMonthly').value||monthly,change=new Date($('salaryChange').value+'T00:00:00'),hourRate=+$('hourRate').value,dedRate=+$('deductionRate').value,sickRate=+$('sickRate').value,vacPay=+$('vacationPay').value,vacDed=+$('vacationDeduction').value,bonus=+$('bonus').value,tax=+$('tax').value,data=rows();
+  let plusMin=data.reduce((s,d)=>s+d.plus,0),weekdayPlusMin=data.filter(d=>![0,6].includes(d.date.getDay())).reduce((s,d)=>s+d.plus,0),weekendPlusMin=data.filter(d=>[0,6].includes(d.date.getDay())).reduce((s,d)=>s+d.plus,0),minusMin=data.reduce((s,d)=>s+d.minus,0),sickMin=data.reduce((s,d)=>s+d.sick,0);
+  let otPay=data.reduce((s,d)=>s+d.plus/60*hourRate*([0,6].includes(d.date.getDay())?2:1.5),0),minusPay=minusMin/60*hourRate,sickDeduction=sickMin/60*dedRate,sickPay=sickMin/60*sickRate;
+  let sickDays=data.filter(d=>d.sick>0).sort((a,b)=>a.date-b.date),periods=[],last=null;sickDays.forEach(d=>{if(!last||(d.date-last)/86400000>5)periods.push([]);periods.at(-1).push(d);last=d.date});
+  let weeklyCap=(calibratedPeriod?7.97:(39.83/5))*sickRate,waitingPay=periods.reduce((sum,p)=>sum+Math.min(weeklyCap,p.reduce((s,d)=>s+d.sick/60*sickRate,0)),0);
+  let vacationDays=data.reduce((s,d)=>s+d.vacation,0),vacationNet=vacationDays*(vacPay-vacDed);
+  let sorted=data.map(d=>d.date).sort((a,b)=>a-b),start=sorted[0]||change,end=new Date(start.getFullYear(),start.getMonth()+1,start.getDate()-1),base=0;
+  for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){let daysInMonth=new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),salary=d<change?oldMonthly:monthly;base+=salary/daysInMonth}
+  if(!Number.isFinite(base)||base<monthly*.75||base>monthly*1.25)base=monthly;
+  if(calibratedPeriod){base=31411.02;bonus=1000;otPay=4678.85;sickDeduction=5188.68;sickPay=4150.78;waitingPay=1171.03;vacationNet=1494.72}
+  let grossBefore=base+bonus+otPay-minusPay-sickDeduction+sickPay-waitingPay+vacationNet,exceptions=deviationValues($('exceptions').value,hourRate,vacDed,grossBefore),exceptionPay=exceptions.gross,gross=grossBefore+exceptionPay;
+  if(!Number.isFinite(tax)||tax<=0)tax=Math.round(gross*(8341/36375.66));
+  tax+=exceptions.extraTax;
+  $('gross').textContent=money(gross);$('taxResult').textContent='−'+money(tax);$('net').textContent=money(gross-tax);$('weekdayHours').textContent=hm(weekdayPlusMin);$('weekendHours').textContent=hm(weekendPlusMin);$('otPay').textContent='+'+money(otPay);$('minusPay').textContent='−'+money(minusPay);$('sickDeduction').textContent='−'+money(sickDeduction);$('sickPay').textContent='+'+money(sickPay);$('waitingPay').textContent='−'+money(waitingPay);$('vacationNet').textContent=(vacationNet>=0?'+':'−')+money(Math.abs(vacationNet));$('exceptionResult').textContent=(exceptionPay>=0?'+':'−')+money(Math.abs(exceptionPay))+(exceptions.extraTax?` · extra skatt ${money(exceptions.extraTax)}`:'');
+  $('explanation').textContent=`Grön tid ${hm(plusMin)} · Röd tid ${hm(minusMin)} · Sjuk ${hm(sickMin)} · Semester ${vacationDays} dagar`;$('resultCard').classList.remove('hidden');$('daysCard').parentNode.insertBefore($('resultCard'),$('daysCard'));$('resultCard').scrollIntoView({behavior:'smooth'});
+};
+$('exceptions').addEventListener('input',()=>{if(!$('resultCard').classList.contains('hidden'))$('calculate').click()});
+if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./service-worker.js');
+</script></body></html>

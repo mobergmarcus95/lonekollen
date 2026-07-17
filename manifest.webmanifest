@@ -1,0 +1,13 @@
+{
+  "name": "Lönekollen",
+  "short_name": "Lönekollen",
+  "description": "Beräkna brutto, skatt, netto, övertid, sjuklön och semester från bilder.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f7f7f8",
+  "theme_color": "#10a37f",
+  "lang": "sv",
+  "icons": [
+    {"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
