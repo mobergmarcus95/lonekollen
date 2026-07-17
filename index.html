@@ -74,11 +74,31 @@
     </div><p id="explanation" class="muted"></p>
   </section>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 const $=id=>document.getElementById(id), months={januari:0,februari:1,mars:2,april:3,maj:4,juni:5,juli:6,augusti:7,september:8,oktober:9,november:10,december:11};
 const money=n=>Number(n||0).toLocaleString('sv-SE',{style:'currency',currency:'SEK'});
 let calibratedPeriod=false;
+let tesseractLoader;
+function ensureTesseract(){
+  if(window.Tesseract)return Promise.resolve(window.Tesseract);
+  if(tesseractLoader)return tesseractLoader;
+  const sources=[
+    'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+    'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js'
+  ];
+  tesseractLoader=new Promise((resolve,reject)=>{
+    const load=index=>{
+      if(index>=sources.length){reject(new Error('Bildläsaren kunde inte laddas. Kontrollera internetanslutningen och försök igen.'));return}
+      const script=document.createElement('script');
+      script.src=sources[index];
+      script.onload=()=>window.Tesseract?resolve(window.Tesseract):load(index+1);
+      script.onerror=()=>load(index+1);
+      document.head.appendChild(script);
+    };
+    load(0);
+  });
+  return tesseractLoader;
+}
 const calibratedDays=[
  {day:16,month:4,normal:350,plus:15},{day:17,month:4,plus:430},{day:19,month:4,normal:510,plus:147},{day:20,month:4,normal:510,plus:122},{day:21,month:4,normal:510,plus:97},
  {day:22,month:4,vacation:510},{day:23,month:4,vacation:350},{day:26,month:4,vacation:510},{day:27,month:4,vacation:510},{day:28,month:4,vacation:510},{day:29,month:4,paidleave:510},{day:30,month:4,vacation:350},
@@ -90,7 +110,7 @@ const hm=m=>`${Math.floor(m/60)}:${String(Math.round(m%60)).padStart(2,'0')}`;
 const num=s=>+(String(s).replace(/\s/g,'').replace(',','.'));
 const imgFrom=file=>new Promise((ok,no)=>{let i=new Image;i.onload=()=>ok(i);i.onerror=no;i.src=URL.createObjectURL(file)});
 
-async function ocr(file){return (await Tesseract.recognize(file,'swe')).data}
+async function ocr(file){const engine=await ensureTesseract();return (await engine.recognize(file,'swe')).data}
 function valuesNear(text,needle,min,max){let pos=text.toLowerCase().indexOf(needle),part=pos<0?text:text.slice(Math.max(0,pos-80),pos+160);return [...part.matchAll(/(-?\d{1,3}(?:[ .]\d{3})*[,.]\d{2}|-?\d{3,6})/g)].map(x=>num(x[1])).filter(x=>x>=min&&x<=max)}
 async function readPayslip(file){
   let d=await ocr(file),t=d.text.replace(/\s+/g,' '),year=(t.match(/20\d{2}/)||[])[0]||new Date().getFullYear();
@@ -186,5 +206,9 @@ $('calculate').onclick=()=>{
   $('explanation').textContent=`Grön tid ${hm(plusMin)} · Röd tid ${hm(minusMin)} · Sjuk ${hm(sickMin)} · Semester ${vacationDays} dagar`;$('resultCard').classList.remove('hidden');$('daysCard').parentNode.insertBefore($('resultCard'),$('daysCard'));$('resultCard').scrollIntoView({behavior:'smooth'});
 };
 $('exceptions').addEventListener('input',()=>{if(!$('resultCard').classList.contains('hidden'))$('calculate').click()});
-if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./service-worker.js');
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(registrations=>{
+    registrations.forEach(registration=>registration.unregister());
+  });
+}
 </script></body></html>
