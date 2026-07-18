@@ -28,7 +28,7 @@
     <label>Lönespecifikation</label><input id="payslip" type="file" accept="image/*">
     <label>Kalenderbilder</label><input id="calendar" type="file" accept="image/*" multiple>
     <label>Avvikelser (frivilligt)</label><textarea id="exceptions" rows="3" placeholder="Exempel: obetald semesterdag 2st, semesterersättning 1 500 kr eller extra skatt 500 kr"></textarea>
-    <button id="read" class="hidden">Räkna automatiskt</button>
+    <button id="read">Räkna</button>
     <div id="status" class="status muted"></div>
   </section>
 
@@ -118,6 +118,14 @@ function amountsIn(text,min,max){
     .map(x=>Math.abs(num(x[0])))
     .filter(x=>Number.isFinite(x)&&x>=min&&x<=max);
 }
+function positionedAmounts(text,min,max){
+  let out=[];
+  for(const m of String(text).matchAll(/-?\d{1,3}(?:[ .]\d{3})*(?:[,.]\d{2})|-?\d{4,6}(?:[,.]\d{2})?/g)){
+    const value=Math.abs(num(m[0]));
+    if(Number.isFinite(value)&&value>=min&&value<=max)out.push({value,pos:m.index||0});
+  }
+  return out;
+}
 function amountsAround(text,labels,min,max,window=260){
   let out=[],lower=text.toLowerCase();
   for(const label of labels){
@@ -130,13 +138,32 @@ function amountsAround(text,labels,min,max,window=260){
   return [...new Set(out.map(x=>x.toFixed(2)))].map(Number);
 }
 function findVerifiedTotals(text){
-  const gross=amountsAround(text,['bruttolön','utbetalning'],10000,100000,320);
-  const tax=amountsAround(text,['skatt','preliminär'],500,50000,260);
-  const net=amountsAround(text,['utbetalas','utbetalning'],5000,100000,420);
+  const gross=amountsAround(text,['bruttolön','utbetalning'],10000,100000,420);
+  const tax=amountsAround(text,['skatt','preliminär'],500,50000,360);
+  const net=amountsAround(text,['utbetalas','utbetalning'],5000,100000,520);
   let best=null;
   for(const g of gross)for(const t of tax)for(const n of net){
     const error=Math.abs(g-t-n);
     if(error<=2&&(!best||error<best.error))best={gross:g,tax:t,net:n,error};
+  }
+  if(best&&best.gross>best.net&&best.tax>0)return best;
+
+  // OCR kan läsa beloppen korrekt men missa rubrikerna. Sök då efter en
+  // rimlig brutto-skatt-netto-kombination och prioritera slutet av lönespecen.
+  const all=positionedAmounts(text,500,100000);
+  for(const g of all.filter(x=>x.value>=10000)){
+    for(const t of all.filter(x=>x.value>=500&&x.value<g.value*.48)){
+      for(const n of all.filter(x=>x.value>=5000&&x.value<g.value)){
+        const error=Math.abs(g.value-t.value-n.value);
+        if(error>2)continue;
+        const latest=Math.min(g.pos,t.pos,n.pos)/Math.max(1,text.length);
+        const close=(Math.max(g.pos,t.pos,n.pos)-Math.min(g.pos,t.pos,n.pos))/Math.max(1,text.length);
+        const taxRatio=t.value/g.value;
+        if(taxRatio<.08||taxRatio>.47||close>.42)continue;
+        const score=latest*100-close*35-error-(g.value>80000?20:0);
+        if(!best||score>best.score)best={gross:g.value,tax:t.value,net:n.value,error,score};
+      }
+    }
   }
   return best&&best.gross>best.net&&best.tax>0?best:null;
 }
@@ -214,9 +241,6 @@ $('read').onclick=async()=>{
     $('status').textContent=`Klart – ${$('rows').rows.length} dagar hittades och lönen har räknats automatiskt. Kontrolltabellen visas nedan.`;$('calculate').click();
   }catch(e){$('status').textContent='Bildläsningen misslyckades: '+e.message+'\nKontrollera internetanslutningen och försök igen.'}finally{$('read').disabled=false}
 };
-function startWhenReady(){if($('payslip').files[0]&&$('calendar').files.length&&!$('read').disabled)$('read').click()}
-$('payslip').addEventListener('change',startWhenReady);$('calendar').addEventListener('change',startWhenReady);
-
 $('calculate').onclick=()=>{
   let monthly=+$('monthly').value,oldMonthly=+$('oldMonthly').value||monthly,change=new Date($('salaryChange').value+'T00:00:00'),hourRate=+$('hourRate').value,dedRate=+$('deductionRate').value,sickRate=+$('sickRate').value,vacPay=+$('vacationPay').value,vacDed=+$('vacationDeduction').value,bonus=+$('bonus').value,tax=+$('tax').value,data=rows();
   let plusMin=data.reduce((s,d)=>s+d.plus,0),weekdayPlusMin=data.filter(d=>![0,6].includes(d.date.getDay())).reduce((s,d)=>s+d.plus,0),weekendPlusMin=data.filter(d=>[0,6].includes(d.date.getDay())).reduce((s,d)=>s+d.plus,0),minusMin=data.reduce((s,d)=>s+d.minus,0),sickMin=data.reduce((s,d)=>s+d.sick,0);
@@ -231,13 +255,14 @@ $('calculate').onclick=()=>{
   let grossBefore=base+bonus+otPay-minusPay-sickDeduction+sickPay-waitingPay+vacationNet,exceptions=deviationValues($('exceptions').value,hourRate,vacDed,grossBefore),exceptionPay=exceptions.gross,gross=grossBefore+exceptionPay;
   if(!Number.isFinite(tax)||tax<=0)tax=Math.round(gross*(8341/36375.66));
   tax+=exceptions.extraTax;
-  let totalsVerified=false;
+  let totalsVerified=false,verifiedNet=null;
   if(verifiedPayslipTotals){
     gross=verifiedPayslipTotals.gross+exceptionPay;
     tax=verifiedPayslipTotals.tax+exceptions.extraTax;
+    verifiedNet=verifiedPayslipTotals.net+exceptionPay-exceptions.extraTax;
     totalsVerified=true;
   }
-  $('gross').textContent=money(gross);$('taxResult').textContent='−'+money(tax);$('net').textContent=money(gross-tax);$('weekdayHours').textContent=hm(weekdayPlusMin);$('weekendHours').textContent=hm(weekendPlusMin);$('otPay').textContent='+'+money(otPay);$('minusPay').textContent='−'+money(minusPay);$('sickDeduction').textContent='−'+money(sickDeduction);$('sickPay').textContent='+'+money(sickPay);$('waitingPay').textContent='−'+money(waitingPay);$('vacationNet').textContent=(vacationNet>=0?'+':'−')+money(Math.abs(vacationNet));$('exceptionResult').textContent=(exceptionPay>=0?'+':'−')+money(Math.abs(exceptionPay))+(exceptions.extraTax?` · extra skatt ${money(exceptions.extraTax)}`:'');
+  $('gross').textContent=money(gross);$('taxResult').textContent='−'+money(tax);$('net').textContent=money(verifiedNet??(gross-tax));$('weekdayHours').textContent=hm(weekdayPlusMin);$('weekendHours').textContent=hm(weekendPlusMin);$('otPay').textContent='+'+money(otPay);$('minusPay').textContent='−'+money(minusPay);$('sickDeduction').textContent='−'+money(sickDeduction);$('sickPay').textContent='+'+money(sickPay);$('waitingPay').textContent='−'+money(waitingPay);$('vacationNet').textContent=(vacationNet>=0?'+':'−')+money(Math.abs(vacationNet));$('exceptionResult').textContent=(exceptionPay>=0?'+':'−')+money(Math.abs(exceptionPay))+(exceptions.extraTax?` · extra skatt ${money(exceptions.extraTax)}`:'');
   $('explanation').textContent=`Grön tid ${hm(plusMin)} · Röd tid ${hm(minusMin)} · Sjuk ${hm(sickMin)} · Semester ${vacationDays} dagar${totalsVerified?' · Brutto, skatt och netto verifierade mot lönespecifikationen.':''}`;$('resultCard').classList.remove('hidden');$('daysCard').parentNode.insertBefore($('resultCard'),$('daysCard'));$('resultCard').scrollIntoView({behavior:'smooth'});
 };
 $('exceptions').addEventListener('input',()=>{if(!$('resultCard').classList.contains('hidden'))$('calculate').click()});
