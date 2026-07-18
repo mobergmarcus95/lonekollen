@@ -336,8 +336,13 @@ $('calculate').onclick=()=>{
   let weeklyCap=(39.83/5)*sickRate,waitingPay=periods.reduce((sum,p)=>sum+Math.min(weeklyCap,p.reduce((s,d)=>s+d.sick/60*sickRate,0)),0);
   let vacationDays=data.reduce((s,d)=>s+d.vacation,0);
   let vacationNet=vacationDays*(vacPay-vacDed);
-  let sorted=data.map(d=>d.date).sort((a,b)=>a-b),start=sorted[0]||change,end=new Date(start.getFullYear(),start.getMonth()+1,start.getDate()-1),base=0;
-  for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){let daysInMonth=new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),salary=d<change?oldMonthly:monthly;base+=salary/daysInMonth}
+  let sorted=data.map(d=>d.date).sort((a,b)=>a-b),start=sorted[0]||change,end=new Date(start.getFullYear(),start.getMonth()+1,start.getDate()-1),base=monthly;
+  if(oldMonthly!==monthly&&change>=start&&change<=end){
+    base=0;
+    for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){
+      const salary=d<change?oldMonthly:monthly,daily=Math.round(salary/31*100)/100;base+=daily;
+    }
+  }
   if(!Number.isFinite(base)||base<monthly*.75||base>monthly*1.25)base=monthly;
   let grossBefore=base+bonus+otPay-minusPay-sickDeduction+sickPay-waitingPay+vacationNet,exceptions=deviationValues($('exceptions').value,hourRate,vacDed,grossBefore),exceptionPay=exceptions.gross,gross=grossBefore+exceptionPay;
   let estimatedTax=verifiedPayslipTotals?Math.round(gross*(verifiedPayslipTotals.tax/verifiedPayslipTotals.gross)):Math.round(gross*(8341/36375.66));
