@@ -59,9 +59,9 @@
 
   <section id="resultCard" class="card hidden">
     <h2>Lön efter beräkning</h2><div class="summary">
-      <div class="metric primary">Bruttolön<b id="gross">–</b></div>
-      <div class="metric primary tax minus">Skatt – Norrtälje<b id="taxResult">–</b></div>
-      <div class="metric primary net plus">Nettolön<b id="net">–</b></div>
+      <div class="metric primary">Beräknad bruttolön<b id="gross">–</b></div>
+      <div class="metric primary tax minus">Uppskattad skatt<b id="taxResult">–</b></div>
+      <div class="metric primary net plus">Beräknad nettolön<b id="net">–</b></div>
       <div class="metric hours">Vardagsövertid<b id="weekdayHours">–</b></div>
       <div class="metric hours">Helgtimmar<b id="weekendHours">–</b></div>
       <div class="metric plus">Plus/OB-ersättning<b id="otPay">–</b></div>
@@ -71,6 +71,13 @@
       <div class="metric minus">Karensavdrag<b id="waitingPay">–</b></div>
       <div class="metric plus">Semester netto<b id="vacationNet">–</b></div>
       <div class="metric">Avvikelser<b id="exceptionResult">0 kr</b></div>
+    </div>
+    <h2 style="margin-top:26px">Kontroll mot lönespecifikationen</h2>
+    <div class="summary">
+      <div class="metric">Utbetald bruttolön<b id="actualGross">–</b></div>
+      <div class="metric">Bruttoavvikelse<b id="grossDifference">–</b></div>
+      <div class="metric">Dragen skatt<b id="actualTax">–</b></div>
+      <div class="metric">Utbetald nettolön<b id="actualNet">–</b></div>
     </div><p id="explanation" class="muted"></p>
   </section>
 </main>
@@ -291,7 +298,7 @@ $('read').onclick=async()=>{
     $('status').textContent='Läser lönebeskedet…';let pay=await readPayslip(p);verifiedPayslipTotals=pay.verifiedTotals;verifiedPayslipDetails=pay.details;for(let [id,v] of Object.entries({monthly:pay.monthly,oldMonthly:pay.oldMonthly,salaryChange:pay.change,hourRate:pay.hour,deductionRate:pay.deduction,sickRate:pay.sick,vacationPay:pay.vacationPay,vacationDeduction:pay.vacationDeduction,bonus:pay.bonus,tax:pay.tax,year:pay.year}))$(id).value=v;
     if(!verifiedPayslipTotals){$('status').textContent='Lönespecifikationens brutto, skatt och netto kunde inte verifieras. Ingen osäker löneberäkning visas. Ta en rak och skarp bild av hela specifikationen, inklusive nederdelen, och försök igen.';$('resultCard').classList.add('hidden');return}
     let all=[];for(let i=0;i<files.length;i++){$('status').textContent=`Läser kalenderbild ${i+1} av ${files.length}…`;all.push(await readCalendar(files[i]))}
-    $('rows').innerHTML='';let found=mergeDays(all);if(calibratedPeriod)found=calibratedDays;found.forEach(addRow);$('daysCard').classList.remove('hidden');
+    $('rows').innerHTML='';let found=mergeDays(all);found.forEach(addRow);$('daysCard').classList.remove('hidden');
     if($('rows').rows.length<8){$('status').textContent=`Bildläsningen hittade bara ${$('rows').rows.length} dagar och stoppades därför. Ingen felaktig lön visas. Prova samma bilder igen.`;$('resultCard').classList.add('hidden');return}
     $('status').textContent=`Klart – ${$('rows').rows.length} dagar hittades och lönen har räknats automatiskt. Kontrolltabellen visas nedan.`;$('calculate').click();
   }catch(e){$('status').textContent='Bildläsningen misslyckades: '+e.message+'\nKontrollera internetanslutningen och försök igen.'}finally{$('read').disabled=false}
@@ -299,35 +306,23 @@ $('read').onclick=async()=>{
 $('calculate').onclick=()=>{
   let monthly=+$('monthly').value,oldMonthly=+$('oldMonthly').value||monthly,change=new Date($('salaryChange').value+'T00:00:00'),hourRate=+$('hourRate').value,dedRate=+$('deductionRate').value,sickRate=+$('sickRate').value,vacPay=+$('vacationPay').value,vacDed=+$('vacationDeduction').value,bonus=+$('bonus').value,tax=+$('tax').value,data=rows();
   let plusMin=data.reduce((s,d)=>s+d.plus,0),weekdayPlusMin=data.filter(d=>![0,6].includes(d.date.getDay())).reduce((s,d)=>s+d.plus,0),weekendPlusMin=data.filter(d=>[0,6].includes(d.date.getDay())).reduce((s,d)=>s+d.plus,0),minusMin=data.reduce((s,d)=>s+d.minus,0),sickMin=data.reduce((s,d)=>s+d.sick,0);
-  let otPay=data.reduce((s,d)=>s+d.plus/60*hourRate*([0,6].includes(d.date.getDay())?2:1.5),0),minusPay=minusMin/60*hourRate,sickDeduction=sickMin/60*dedRate,sickPay=sickMin/60*sickRate;
+  let paidWeekdayMin=Math.max(0,weekdayPlusMin-minusMin),remainingMinusMin=Math.max(0,minusMin-weekdayPlusMin);
+  let payrollHourRate=Math.round(hourRate*100)/100,paidWeekdayHours=Math.round(paidWeekdayMin/60*100)/100,weekendHours=Math.round(weekendPlusMin/60*100)/100;
+  let otPay=paidWeekdayHours*payrollHourRate*1.5+weekendHours*payrollHourRate*2,minusPay=remainingMinusMin/60*hourRate,sickDeduction=sickMin/60*dedRate,sickPay=sickMin/60*sickRate;
   let sickDays=data.filter(d=>d.sick>0).sort((a,b)=>a.date-b.date),periods=[],last=null;sickDays.forEach(d=>{if(!last||(d.date-last)/86400000>5)periods.push([]);periods.at(-1).push(d);last=d.date});
-  let weeklyCap=(calibratedPeriod?7.97:(39.83/5))*sickRate,waitingPay=periods.reduce((sum,p)=>sum+Math.min(weeklyCap,p.reduce((s,d)=>s+d.sick/60*sickRate,0)),0);
+  let weeklyCap=(39.83/5)*sickRate,waitingPay=periods.reduce((sum,p)=>sum+Math.min(weeklyCap,p.reduce((s,d)=>s+d.sick/60*sickRate,0)),0);
   let vacationDays=data.reduce((s,d)=>s+d.vacation,0);
-  if(verifiedPayslipDetails?.vacationDays>0)vacationDays=verifiedPayslipDetails.vacationDays;
   let vacationNet=vacationDays*(vacPay-vacDed);
-  if(verifiedPayslipDetails){
-    if(verifiedPayslipDetails.weekdayHours>0||verifiedPayslipDetails.weekendHours>0){
-      weekdayPlusMin=Math.round(verifiedPayslipDetails.weekdayHours*60);
-      weekendPlusMin=Math.round(verifiedPayslipDetails.weekendHours*60);
-      otPay=verifiedPayslipDetails.weekdayHours*hourRate*1.5+verifiedPayslipDetails.weekendHours*hourRate*2;
-    }else if(verifiedPayslipDetails.overtimePay!==null)otPay=verifiedPayslipDetails.overtimePay;
-  }
   let sorted=data.map(d=>d.date).sort((a,b)=>a-b),start=sorted[0]||change,end=new Date(start.getFullYear(),start.getMonth()+1,start.getDate()-1),base=0;
   for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){let daysInMonth=new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),salary=d<change?oldMonthly:monthly;base+=salary/daysInMonth}
   if(!Number.isFinite(base)||base<monthly*.75||base>monthly*1.25)base=monthly;
-  if(calibratedPeriod){base=31411.02;bonus=1000;otPay=4678.85;sickDeduction=5188.68;sickPay=4150.78;waitingPay=1171.03;vacationNet=1494.72}
   let grossBefore=base+bonus+otPay-minusPay-sickDeduction+sickPay-waitingPay+vacationNet,exceptions=deviationValues($('exceptions').value,hourRate,vacDed,grossBefore),exceptionPay=exceptions.gross,gross=grossBefore+exceptionPay;
-  if(!Number.isFinite(tax)||tax<=0)tax=Math.round(gross*(8341/36375.66));
-  tax+=exceptions.extraTax;
-  let totalsVerified=false,verifiedNet=null;
-  if(verifiedPayslipTotals){
-    gross=verifiedPayslipTotals.gross+exceptionPay;
-    tax=verifiedPayslipTotals.tax+exceptions.extraTax;
-    verifiedNet=verifiedPayslipTotals.net+exceptionPay-exceptions.extraTax;
-    totalsVerified=true;
-  }
-  $('gross').textContent=money(gross);$('taxResult').textContent='−'+money(tax);$('net').textContent=money(verifiedNet??(gross-tax));$('weekdayHours').textContent=hm(weekdayPlusMin);$('weekendHours').textContent=hm(weekendPlusMin);$('otPay').textContent='+'+money(otPay);$('minusPay').textContent='−'+money(minusPay);$('sickDeduction').textContent='−'+money(sickDeduction);$('sickPay').textContent='+'+money(sickPay);$('waitingPay').textContent='−'+money(waitingPay);$('vacationNet').textContent=(vacationNet>=0?'+':'−')+money(Math.abs(vacationNet));$('exceptionResult').textContent=(exceptionPay>=0?'+':'−')+money(Math.abs(exceptionPay))+(exceptions.extraTax?` · extra skatt ${money(exceptions.extraTax)}`:'');
-  $('explanation').textContent=`Grön tid ${hm(plusMin)} · Röd tid ${hm(minusMin)} · Sjuk ${hm(sickMin)} · Semester ${vacationDays} dagar${totalsVerified?' · Brutto, skatt och netto verifierade mot lönespecifikationen.':''}`;$('resultCard').classList.remove('hidden');$('daysCard').parentNode.insertBefore($('resultCard'),$('daysCard'));$('resultCard').scrollIntoView({behavior:'smooth'});
+  let estimatedTax=verifiedPayslipTotals?Math.round(gross*(verifiedPayslipTotals.tax/verifiedPayslipTotals.gross)):Math.round(gross*(8341/36375.66));
+  estimatedTax+=exceptions.extraTax;
+  const actualGross=verifiedPayslipTotals?.gross??0,actualTax=verifiedPayslipTotals?.tax??0,actualNet=verifiedPayslipTotals?.net??0,grossDifference=actualGross-gross;
+  $('gross').textContent=money(gross);$('taxResult').textContent='−'+money(estimatedTax);$('net').textContent=money(gross-estimatedTax);$('weekdayHours').textContent=hm(paidWeekdayMin);$('weekendHours').textContent=hm(weekendPlusMin);$('otPay').textContent='+'+money(otPay);$('minusPay').textContent='−'+money(minusPay);$('sickDeduction').textContent='−'+money(sickDeduction);$('sickPay').textContent='+'+money(sickPay);$('waitingPay').textContent='−'+money(waitingPay);$('vacationNet').textContent=(vacationNet>=0?'+':'−')+money(Math.abs(vacationNet));$('exceptionResult').textContent=(exceptionPay>=0?'+':'−')+money(Math.abs(exceptionPay))+(exceptions.extraTax?` · extra skatt ${money(exceptions.extraTax)}`:'');
+  $('actualGross').textContent=money(actualGross);$('actualTax').textContent='−'+money(actualTax);$('actualNet').textContent=money(actualNet);$('grossDifference').textContent=(grossDifference>=0?'+':'−')+money(Math.abs(grossDifference));$('grossDifference').parentElement.className='metric '+(Math.abs(grossDifference)<1?'plus':'minus');
+  $('explanation').textContent=`Kalenderns gröna tid ${hm(plusMin)} minus röd tid ${hm(minusMin)} ger ${hm(paidWeekdayMin)} betald vardagsövertid. Sjuk ${hm(sickMin)} · Semester ${vacationDays} dagar. Bruttoavvikelsen är lönespecens bruttolön minus programmets självständiga beräkning.`;$('resultCard').classList.remove('hidden');$('daysCard').parentNode.insertBefore($('resultCard'),$('daysCard'));$('resultCard').scrollIntoView({behavior:'smooth'});
 };
 $('exceptions').addEventListener('input',()=>{if(!$('resultCard').classList.contains('hidden'))$('calculate').click()});
 if('serviceWorker' in navigator){
