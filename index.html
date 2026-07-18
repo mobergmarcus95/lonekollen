@@ -75,13 +75,13 @@
     <h2 style="margin-top:26px">Kontroll mot lönespecifikationen</h2>
     <div class="summary">
       <div class="metric">Utbetald bruttolön<b id="actualGross">–</b></div>
-      <div class="metric">Bruttoavvikelse<b id="grossDifference">–</b></div>
+      <div class="metric"><span id="grossDifferenceLabel">Bruttoavvikelse</span><b id="grossDifference">–</b></div>
       <div class="metric">Dragen skatt<b id="actualTax">–</b></div>
       <div class="metric">Utbetald nettolön<b id="actualNet">–</b></div>
       <div class="metric">Lönespec vardagsövertid<b id="actualWeekdayHours">–</b></div>
-      <div class="metric">Avvikelse vardagstid<b id="weekdayDifference">–</b></div>
+      <div class="metric"><span id="weekdayDifferenceLabel">Avvikelse vardagstid</span><b id="weekdayDifference">–</b></div>
       <div class="metric">Lönespec helgtimmar<b id="actualWeekendHours">–</b></div>
-      <div class="metric">Avvikelse helgtid<b id="weekendDifference">–</b></div>
+      <div class="metric"><span id="weekendDifferenceLabel">Avvikelse helgtid</span><b id="weekendDifference">–</b></div>
     </div><p id="explanation" class="muted"></p>
   </section>
 </main>
@@ -206,8 +206,8 @@ function payslipLineDetails(lines){
     if(/övertid|grundtimlön vid övertid|overtid/i.test(lower)){
       if(amount!==null){overtimePay+=amount;hasOvertime=true}
       if(qty>0&&!/grundtimlön|grundtimlon/i.test(lower)){
-        if(/helg|100\s*%/i.test(lower))weekendHours=Math.max(weekendHours,qty);
-        else weekdayHours=Math.max(weekdayHours,qty);
+        if(/helg|100\s*%/i.test(lower))weekendHours+=qty;
+        else weekdayHours+=qty;
       }
     }
     if(/sem(?:e|o)sterlön|semesterlon/i.test(lower)){
@@ -347,12 +347,21 @@ $('calculate').onclick=()=>{
   let grossBefore=base+bonus+otPay-minusPay-sickDeduction+sickPay-waitingPay+vacationNet,exceptions=deviationValues($('exceptions').value,hourRate,vacDed,grossBefore),exceptionPay=exceptions.gross,gross=grossBefore+exceptionPay;
   let estimatedTax=verifiedPayslipTotals?Math.round(gross*(verifiedPayslipTotals.tax/verifiedPayslipTotals.gross)):Math.round(gross*(8341/36375.66));
   estimatedTax+=exceptions.extraTax;
-  const actualGross=verifiedPayslipTotals?.gross??0,actualTax=verifiedPayslipTotals?.tax??0,actualNet=verifiedPayslipTotals?.net??0,grossDifference=actualGross-gross;
+  const actualGross=verifiedPayslipTotals?.gross??0,actualTax=verifiedPayslipTotals?.tax??0,actualNet=verifiedPayslipTotals?.net??0,missingGross=gross-actualGross;
   $('gross').textContent=money(gross);$('taxResult').textContent='−'+money(estimatedTax);$('net').textContent=money(gross-estimatedTax);$('weekdayHours').textContent=hm(paidWeekdayMin);$('weekendHours').textContent=hm(paidWeekendMin);$('otPay').textContent='+'+money(otPay);$('minusPay').textContent='−'+money(minusPay);$('sickDeduction').textContent='−'+money(sickDeduction);$('sickPay').textContent='+'+money(sickPay);$('waitingPay').textContent='−'+money(waitingPay);$('vacationNet').textContent=(vacationNet>=0?'+':'−')+money(Math.abs(vacationNet));$('exceptionResult').textContent=(exceptionPay>=0?'+':'−')+money(Math.abs(exceptionPay))+(exceptions.extraTax?` · extra skatt ${money(exceptions.extraTax)}`:'');
-  $('actualGross').textContent=money(actualGross);$('actualTax').textContent='−'+money(actualTax);$('actualNet').textContent=money(actualNet);$('grossDifference').textContent=(grossDifference>=0?'+':'−')+money(Math.abs(grossDifference));$('grossDifference').parentElement.className='metric '+(Math.abs(grossDifference)<1?'plus':'minus');
-  const actualWeekdayMin=Math.round((verifiedPayslipDetails?.weekdayHours||0)*60),actualWeekendMin=Math.round((verifiedPayslipDetails?.weekendHours||0)*60),weekdayDiff=actualWeekdayMin-paidWeekdayMin,weekendDiff=actualWeekendMin-paidWeekendMin;
-  $('actualWeekdayHours').textContent=hm(actualWeekdayMin);$('actualWeekendHours').textContent=hm(actualWeekendMin);$('weekdayDifference').textContent=(weekdayDiff>=0?'+':'−')+hm(Math.abs(weekdayDiff));$('weekendDifference').textContent=(weekendDiff>=0?'+':'−')+hm(Math.abs(weekendDiff));$('weekdayDifference').parentElement.className='metric '+(Math.abs(weekdayDiff)<=1?'plus':'minus');$('weekendDifference').parentElement.className='metric '+(Math.abs(weekendDiff)<=1?'plus':'minus');
-  $('explanation').textContent=`Tidsrapporten är facit: vardag ${hm(weekdayPlusMin)} grönt minus ${hm(weekdayMinusMin)} rött = ${hm(paidWeekdayMin)}. Helg ${hm(weekendPlusMin)} grönt minus ${hm(weekendMinusMin)} rött = ${hm(paidWeekendMin)}. Vardagsminus dras aldrig från helgtid. Sjuk ${hm(sickMin)} · Semester ${vacationDays} dagar. Avvikelserna visar lönespecen minus tidsrapportens självständiga beräkning.`;$('resultCard').classList.remove('hidden');$('daysCard').parentNode.insertBefore($('resultCard'),$('daysCard'));$('resultCard').scrollIntoView({behavior:'smooth'});
+  $('actualGross').textContent=money(actualGross);$('actualTax').textContent='−'+money(actualTax);$('actualNet').textContent=money(actualNet);
+  if(Math.abs(missingGross)<1){$('grossDifferenceLabel').textContent='Bruttolönen stämmer';$('grossDifference').textContent=money(0);$('grossDifference').parentElement.className='metric plus'}
+  else if(missingGross>0){$('grossDifferenceLabel').textContent='Saknas i bruttolön';$('grossDifference').textContent=money(missingGross);$('grossDifference').parentElement.className='metric minus'}
+  else{$('grossDifferenceLabel').textContent='Extra utbetald bruttolön';$('grossDifference').textContent=money(-missingGross);$('grossDifference').parentElement.className='metric plus'}
+  const actualWeekdayMin=Math.round((verifiedPayslipDetails?.weekdayHours||0)*60),actualWeekendMin=Math.round((verifiedPayslipDetails?.weekendHours||0)*60),missingWeekday=paidWeekdayMin-actualWeekdayMin,missingWeekend=paidWeekendMin-actualWeekendMin;
+  $('actualWeekdayHours').textContent=hm(actualWeekdayMin);$('actualWeekendHours').textContent=hm(actualWeekendMin);
+  const showTimeDifference=(labelId,valueId,missing,label)=>{
+    if(Math.abs(missing)<=1){$(labelId).textContent=`${label} stämmer`;$(valueId).textContent='0:00';$(valueId).parentElement.className='metric plus'}
+    else if(missing>0){$(labelId).textContent=`Saknas ${label.toLowerCase()}`;$(valueId).textContent=hm(missing);$(valueId).parentElement.className='metric minus'}
+    else{$(labelId).textContent=`Extra ${label.toLowerCase()}`;$(valueId).textContent=hm(-missing);$(valueId).parentElement.className='metric plus'}
+  };
+  showTimeDifference('weekdayDifferenceLabel','weekdayDifference',missingWeekday,'Vardagstid');showTimeDifference('weekendDifferenceLabel','weekendDifference',missingWeekend,'Helgtid');
+  $('explanation').textContent=`Tidsrapporten är facit: vardag ${hm(weekdayPlusMin)} grönt minus ${hm(weekdayMinusMin)} rött = ${hm(paidWeekdayMin)}. Helg ${hm(weekendPlusMin)} grönt minus ${hm(weekendMinusMin)} rött = ${hm(paidWeekendMin)}. Vardagsminus dras aldrig från helgtid. Sjuk ${hm(sickMin)} · Semester ${vacationDays} dagar. ”Saknas” betyder att tidsrapportens självständiga beräkning är högre än det som står på lönespecen.`;$('resultCard').classList.remove('hidden');$('daysCard').parentNode.insertBefore($('resultCard'),$('daysCard'));$('resultCard').scrollIntoView({behavior:'smooth'});
 };
 $('exceptions').addEventListener('input',()=>{if(!$('resultCard').classList.contains('hidden'))$('calculate').click()});
 if('serviceWorker' in navigator){
