@@ -91,6 +91,7 @@ const money=n=>Number(n||0).toLocaleString('sv-SE',{style:'currency',currency:'S
 let calibratedPeriod=false;
 let verifiedPayslipTotals=null;
 let verifiedPayslipDetails=null;
+let expectedPayPeriod=null;
 let tesseractLoader;
 function ensureTesseract(){
   if(window.Tesseract)return Promise.resolve(window.Tesseract);
@@ -223,6 +224,8 @@ function payslipLineDetails(lines){
 async function readPayslip(file){
   let d=await ocr(file),bottomA=await ocrCrop(file,.45),bottomB=await ocrCrop(file,.68);
   let combined=[d.text,bottomA.text,bottomB.text].join(' '),t=combined.replace(/\s+/g,' '),year=(t.match(/20\d{2}/)||[])[0]||new Date().getFullYear();
+  const periodMatch=t.match(/(20\d{2})[-./](\d{2})[-./](\d{2})\s*-\s*(20\d{2})[-./](\d{2})[-./](\d{2})/);
+  const period=periodMatch?{start:new Date(+periodMatch[1],+periodMatch[2]-1,+periodMatch[3]),end:new Date(+periodMatch[4],+periodMatch[5]-1,+periodMatch[6])}:null;
   const verifiedTotals=findVerifiedTotals(combined);
   const fullLines=(d.lines||[]).map(line=>String(line.text||'').replace(/\s+/g,' ').trim()).filter(Boolean);
   const bottomLines=(bottomA.lines||[]).map(line=>String(line.text||'').replace(/\s+/g,' ').trim()).filter(Boolean);
@@ -235,10 +238,13 @@ async function readPayslip(file){
     vacationNet:fullDetails.vacationNet,
     vacationDays:fullDetails.vacationDays
   };
-  let monthly=valuesNear(t,'månadslön',20000,100000)[0]||31700;
+  const monthlyRead=valuesNear(t,'månadslön',20000,100000)[0]||null;
+  let monthly=monthlyRead||31700;
   let decimals=[...t.matchAll(/\b(\d{2,3}[,.]\d{2})\b/g)].map(x=>num(x[1]));
-  let deduction=decimals.find(x=>x>182&&x<190)||183.67,sick=decimals.find(x=>x>140&&x<155)||146.93;
-  let hour=decimals.find(x=>x>175&&x<183)||monthly/175,vacationPay=decimals.find(x=>x>1500&&x<1900)||monthly*.054,vacationDeduction=decimals.find(x=>x>1300&&x<1500)||monthly*.046;
+  const deductionRead=decimals.find(x=>x>182&&x<190)||null,sickRead=decimals.find(x=>x>140&&x<155)||null;
+  const hourRead=decimals.find(x=>x>175&&x<183)||null,vacationPayRead=decimals.find(x=>x>1500&&x<1900)||null,vacationDeductionRead=decimals.find(x=>x>1300&&x<1500)||null;
+  let deduction=deductionRead||183.67,sick=sickRead||146.93;
+  let hour=hourRead||monthly/175,vacationPay=vacationPayRead||monthly*.054,vacationDeduction=vacationDeductionRead||monthly*.046;
   let note=t.match(/ny lön[^0-9]*(?:från[^0-9]*)?(\d{1,2})[^a-zåäö0-9]+(januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)[^0-9]*(\d{5})/i)||[];
   let daily=[...new Set(decimals.filter(x=>x>900&&x<1200).map(x=>x.toFixed(2)))].map(Number),hasChange=note[3]||daily.length>1;
   if(note[3])monthly=+note[3];else if(daily.length>1)monthly=Math.round(Math.max(...daily)*31/10)*10;
@@ -249,7 +255,8 @@ async function readPayslip(file){
   if(!Number.isFinite(oldMonthly)||oldMonthly<monthly*.75||oldMonthly>monthly*1.25)oldMonthly=monthly;
   calibratedPeriod=(+year===2025&&Math.abs(hour-181.14)<.2&&Math.abs(deduction-183.67)<.2&&Math.abs(vacationPay-1681.56)<1);
   if(calibratedPeriod)tax=8341;
-  return {monthly,oldMonthly,hour,deduction,sick,vacationPay,vacationDeduction,bonus,tax,verifiedTotals,details,change:hasChange?`${year}-${String(changeMonth+1).padStart(2,'0')}-${String(changeDay).padStart(2,'0')}`:`${year}-01-01`,year:+year};
+  const readChecks={monthly:!!monthlyRead,hour:!!hourRead,deduction:!!deductionRead,sick:!!sickRead,vacationPay:!!vacationPayRead,vacationDeduction:!!vacationDeductionRead};
+  return {monthly,oldMonthly,hour,deduction,sick,vacationPay,vacationDeduction,bonus,tax,verifiedTotals,details,period,readChecks,change:hasChange?`${year}-${String(changeMonth+1).padStart(2,'0')}-${String(changeDay).padStart(2,'0')}`:`${year}-01-01`,year:+year};
 }
 
 function redShape(canvas,x0,y0,x1,y1){
@@ -274,11 +281,11 @@ function readCalendarText(text,year){
     for(const m of part.matchAll(/(\d{1,2})\s*h\s*(?:(\d{1,2})\s*m)?|(\d{1,3})\s*m\b/g)){
       const minutes=m[3]?+m[3]:(+m[1]*60+(+m[2]||0));if(minutes>0&&minutes<=24*60)durations.push(minutes);
     }
-    if(durations.length<2)continue;
-    const date=new Date(year,d.month,d.day),expected=date.getDay()===5?350:([0,6].includes(date.getDay())?0:510),difference=durations[1];
-    let normal=durations[0];if(expected>0&&normal<expected/2)normal=expected;
-    const row={day:d.day,month:d.month,normal,plus:0,minus:0,sick:0,vacation:0,paidleave:0};
-    if(normal<expected-2)row.minus=difference;else row.plus=difference;
+    const date=new Date(year,d.month,d.day),expected=date.getDay()===5?350:([0,6].includes(date.getDay())?0:510),row={day:d.day,month:d.month,normal:durations[0]||0,plus:0,minus:0,sick:0,vacation:0,paidleave:0,covered:true};
+    if(durations.length>=2){
+      const difference=durations[1];let normal=durations[0];if(expected>0&&normal<expected/2)normal=expected;row.normal=normal;
+      if(normal<expected-2)row.minus=difference;else row.plus=difference;
+    }
     out.push(row);
   }
   return out;
@@ -298,7 +305,7 @@ async function readCalendar(file){
   let out=[];for(let j=0;j<dateWords.length;j++){let dt=dateWords[j],next=dateWords[j+1]?.y??canvas.height,vals=durations.filter(x=>x.y>dt.y+35*scale&&x.y<next);if(!vals.length)continue;let row={day:dt.day,month:dt.month,normal:0,plus:0,minus:0,sick:0,vacation:0,paidleave:0};vals.forEach(v=>row[v.type]+=v.mins);out.push(row)}
   return mergeDays([out,readCalendarText(d.text,+$('year').value||new Date().getFullYear())]);
 }
-function mergeDays(all){let map={};all.flat().forEach(x=>{let k=`${x.month}-${x.day}`,d=map[k]??={...x,normal:0,plus:0,minus:0,sick:0,vacation:0,paidleave:0};for(let p of ['normal','plus','minus','sick','vacation','paidleave'])d[p]=Math.max(d[p],x[p]||0);map[k]=d});return Object.values(map).sort((a,b)=>a.month-b.month||a.day-b.day)}
+function mergeDays(all){let map={};all.flat().forEach(x=>{let k=`${x.month}-${x.day}`,d=map[k]??={...x,normal:0,plus:0,minus:0,sick:0,vacation:0,paidleave:0,covered:false};for(let p of ['normal','plus','minus','sick','vacation','paidleave'])d[p]=Math.max(d[p],x[p]||0);d.covered=!!(d.covered||x.covered);map[k]=d});return Object.values(map).sort((a,b)=>a.month-b.month||a.day-b.day)}
 function addRow(d){
   let tr=document.createElement('tr');tr.dataset.month=d.month;tr.dataset.day=d.day;
   tr.innerHTML=`<td>${d.day}/${d.month+1}</td><td><input data-k="normal" value="${hm(d.normal)}"></td><td><input data-k="plus" class="plus" value="${hm(d.plus)}"></td><td><input data-k="minus" class="minus" value="${hm(d.minus)}"></td><td><input data-k="sick" value="${hm(d.sick)}"></td><td><select data-k="vacation"><option value="0" ${d.vacation?'':'selected'}>Nej</option><option value="1" ${d.vacation?'selected':''}>Betald</option></select></td><td><button type="button" style="margin:0;background:#77837b;padding:7px" onclick="this.closest('tr').remove()">Ta bort</button></td>`;
@@ -318,12 +325,41 @@ function deviationValues(text,hourRate,vacationDeduction,grossBefore){
 $('read').onclick=async()=>{
   let p=$('payslip').files[0],files=[...$('calendar').files];if(!p||!files.length){$('status').textContent='Välj både lönebeskedet och kalenderbilderna.';return}
   $('read').disabled=true;try{
-    $('status').textContent='Läser lönebeskedet…';let pay=await readPayslip(p);verifiedPayslipTotals=pay.verifiedTotals;verifiedPayslipDetails=pay.details;for(let [id,v] of Object.entries({monthly:pay.monthly,oldMonthly:pay.oldMonthly,salaryChange:pay.change,hourRate:pay.hour,deductionRate:pay.deduction,sickRate:pay.sick,vacationPay:pay.vacationPay,vacationDeduction:pay.vacationDeduction,bonus:pay.bonus,tax:pay.tax,year:pay.year}))$(id).value=v;
+    $('status').textContent='Läser lönebeskedet…';let pay=await readPayslip(p);verifiedPayslipTotals=pay.verifiedTotals;verifiedPayslipDetails=pay.details;expectedPayPeriod=pay.period;for(let [id,v] of Object.entries({monthly:pay.monthly,oldMonthly:pay.oldMonthly,salaryChange:pay.change,hourRate:pay.hour,deductionRate:pay.deduction,sickRate:pay.sick,vacationPay:pay.vacationPay,vacationDeduction:pay.vacationDeduction,bonus:pay.bonus,tax:pay.tax,year:pay.year}))$(id).value=v;
+    if(!expectedPayPeriod){$('status').textContent='Löneperioden kunde inte läsas säkert från lönespecifikationen. Ingen beräkning visas. Ta en rak och skarp bild där hela löneperioden syns.';$('resultCard').classList.add('hidden');return}
+    if(!pay.readChecks.monthly||!pay.readChecks.hour){$('status').textContent='Månadslön eller övertidens timpris kunde inte verifieras i lönespecifikationen. Programmet använder inga reservvärden. Ingen beräkning visas.';$('resultCard').classList.add('hidden');return}
     if(!verifiedPayslipTotals){$('status').textContent='Lönespecifikationens brutto, skatt och netto kunde inte verifieras. Ingen osäker löneberäkning visas. Ta en rak och skarp bild av hela specifikationen, inklusive nederdelen, och försök igen.';$('resultCard').classList.add('hidden');return}
     let all=[];for(let i=0;i<files.length;i++){$('status').textContent=`Läser kalenderbild ${i+1} av ${files.length}…`;all.push(await readCalendar(files[i]))}
-    $('rows').innerHTML='';let found=mergeDays(all);found.forEach(addRow);$('daysCard').classList.remove('hidden');
+    $('rows').innerHTML='';let found=mergeDays(all);
+    const inPeriod=d=>{
+      let y=expectedPayPeriod.start.getFullYear();if(d.month<expectedPayPeriod.start.getMonth())y++;
+      const date=new Date(y,d.month,d.day);return date>=expectedPayPeriod.start&&date<=expectedPayPeriod.end;
+    };
+    found=found.filter(inPeriod);found.forEach(addRow);$('daysCard').classList.remove('hidden');
+    if(expectedPayPeriod){
+      const covered=new Set(found.filter(d=>d.covered).map(d=>`${d.month}-${d.day}`)),missing=[];
+      for(let date=new Date(expectedPayPeriod.start);date<=expectedPayPeriod.end;date.setDate(date.getDate()+1)){
+        if(!covered.has(`${date.getMonth()}-${date.getDate()}`))missing.push(new Date(date));
+      }
+      if(missing.length){
+        const list=missing.map(d=>d.toLocaleDateString('sv-SE',{day:'numeric',month:'short'})).join(', ');
+        $('status').textContent=`Beräkningen stoppades eftersom tidsbilder saknas för: ${list}. Lägg till bilder som täcker dessa datum och tryck Räkna igen. Ingen osäker lön visas.`;$('resultCard').classList.add('hidden');return;
+      }
+    }
+    const uncertainWeekdays=found.filter(d=>{
+      let y=expectedPayPeriod.start.getFullYear();if(d.month<expectedPayPeriod.start.getMonth())y++;
+      const dow=new Date(y,d.month,d.day).getDay(),total=d.normal+d.plus+d.minus+d.sick+d.vacation+d.paidleave;
+      return dow>=1&&dow<=5&&total===0;
+    });
+    if(uncertainWeekdays.length){
+      const list=uncertainWeekdays.map(d=>`${d.day}/${d.month+1}`).join(', ');
+      $('status').textContent=`Beräkningen stoppades: följande vardagar är oläsliga eller helt tomma i tidsbilderna: ${list}. Ingen osäker lön visas.`;$('resultCard').classList.add('hidden');return;
+    }
+    const needsSick=found.some(d=>d.sick>0),needsVacation=found.some(d=>d.vacation>0);
+    if(needsSick&&(!pay.readChecks.deduction||!pay.readChecks.sick)){$('status').textContent='Sjukfrånvaro hittades, men sjukavdrag och sjuklön kunde inte verifieras på lönespecifikationen. Ingen osäker lön visas.';$('resultCard').classList.add('hidden');return}
+    if(needsVacation&&(!pay.readChecks.vacationPay||!pay.readChecks.vacationDeduction)){$('status').textContent='Semester hittades, men semesterlön och semesteravdrag kunde inte verifieras på lönespecifikationen. Ingen osäker lön visas.';$('resultCard').classList.add('hidden');return}
     if($('rows').rows.length<8){$('status').textContent=`Bildläsningen hittade bara ${$('rows').rows.length} dagar och stoppades därför. Ingen felaktig lön visas. Prova samma bilder igen.`;$('resultCard').classList.add('hidden');return}
-    $('status').textContent=`Klart – ${$('rows').rows.length} dagar hittades och lönen har räknats automatiskt. Kontrolltabellen visas nedan.`;$('calculate').click();
+    $('status').textContent=`Underlaget är komplett: hela löneperioden och nödvändiga lönevärden är verifierade. ${$('rows').rows.length} kalenderdagar finns i kontrolltabellen nedan.`;$('calculate').click();
   }catch(e){$('status').textContent='Bildläsningen misslyckades: '+e.message+'\nKontrollera internetanslutningen och försök igen.'}finally{$('read').disabled=false}
 };
 $('calculate').onclick=()=>{
