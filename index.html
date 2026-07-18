@@ -154,10 +154,11 @@ function findVerifiedTotals(text){
   const net=amountsAround(text,['utbetalas','utbetalning'],5000,100000,520);
   let best=null;
   for(const g of gross)for(const t of tax)for(const n of net){
+    if(n<=t)continue;
     const error=Math.abs(g-t-n);
     if(error<=2&&(!best||error<best.error))best={gross:g,tax:t,net:n,error};
   }
-  if(best&&best.gross>best.net&&best.tax>0)return best;
+  if(best&&best.gross>best.net&&best.net>best.tax&&best.tax>0)return best;
 
   // OCR kan läsa beloppen korrekt men missa rubrikerna. Sök då efter en
   // rimlig brutto-skatt-netto-kombination och prioritera slutet av lönespecen.
@@ -165,6 +166,7 @@ function findVerifiedTotals(text){
   for(const g of all.filter(x=>x.value>=10000)){
     for(const t of all.filter(x=>x.value>=500&&x.value<g.value*.48)){
       for(const n of all.filter(x=>x.value>=5000&&x.value<g.value)){
+        if(n.value<=t.value)continue;
         const error=Math.abs(g.value-t.value-n.value);
         if(error>2)continue;
         const latest=Math.min(g.pos,t.pos,n.pos)/Math.max(1,text.length);
@@ -176,14 +178,14 @@ function findVerifiedTotals(text){
       }
     }
   }
-  return best&&best.gross>best.net&&best.tax>0?best:null;
+  return best&&best.gross>best.net&&best.net>best.tax&&best.tax>0?best:null;
 }
 function lastLineAmount(line,min=1,max=100000){
   const values=amountsIn(line,min,max);
   return values.length?values.at(-1):null;
 }
 function payslipLineDetails(lines){
-  let overtimePay=0,weekdayHours=0,weekendHours=0,vacationNet=0,hasOvertime=false,hasVacation=false;
+  let overtimePay=0,weekdayHours=0,weekendHours=0,vacationNet=0,vacationDays=0,hasOvertime=false,hasVacation=false;
   for(const raw of lines){
     const line=String(raw||'').replace(/\s+/g,' ').trim(),lower=line.toLowerCase();
     if(!line)continue;
@@ -197,25 +199,35 @@ function payslipLineDetails(lines){
         else weekdayHours=Math.max(weekdayHours,qty);
       }
     }
-    if(/semesterlön|semesterlon/i.test(lower)){
+    if(/sem(?:e|o)sterlön|semesterlon/i.test(lower)){
       if(amount!==null){vacationNet+=amount;hasVacation=true}
+      const days=line.match(/(\d{1,4}(?:[,.]\d{1,2})?)\s*dagar\b/i);
+      if(days){let count=num(days[1]);if(count>31&&Number.isInteger(count))count/=100;if(count>0&&count<=31)vacationDays+=count}
     }else if(/semesteravdrag/i.test(lower)){
       if(amount!==null){vacationNet-=amount;hasVacation=true}
     }
   }
-  return {overtimePay:hasOvertime?overtimePay:null,weekdayHours,weekendHours,vacationNet:hasVacation?vacationNet:null};
+  return {overtimePay:hasOvertime?overtimePay:null,weekdayHours,weekendHours,vacationNet:hasVacation?vacationNet:null,vacationDays};
 }
 async function readPayslip(file){
-  let d=await ocr(file),bottomA=await ocrCrop(file,.52),bottomB=await ocrCrop(file,.68);
+  let d=await ocr(file),bottomA=await ocrCrop(file,.45),bottomB=await ocrCrop(file,.68);
   let combined=[d.text,bottomA.text,bottomB.text].join(' '),t=combined.replace(/\s+/g,' '),year=(t.match(/20\d{2}/)||[])[0]||new Date().getFullYear();
   const verifiedTotals=findVerifiedTotals(combined);
-  const bestLines=(d.lines&&d.lines.length?d.lines:(bottomA.lines&&bottomA.lines.length?bottomA.lines:bottomB.lines))||[];
-  const lineTexts=bestLines.map(line=>String(line.text||'').replace(/\s+/g,' ').trim()).filter(Boolean);
-  const details=payslipLineDetails(lineTexts.length?lineTexts:combined.split(/\n+/));
+  const fullLines=(d.lines||[]).map(line=>String(line.text||'').replace(/\s+/g,' ').trim()).filter(Boolean);
+  const bottomLines=(bottomA.lines||[]).map(line=>String(line.text||'').replace(/\s+/g,' ').trim()).filter(Boolean);
+  const fullDetails=payslipLineDetails(fullLines.length?fullLines:d.text.split(/\n+/));
+  const bottomDetails=payslipLineDetails(bottomLines.length?bottomLines:bottomA.text.split(/\n+/));
+  const details={
+    overtimePay:bottomDetails.overtimePay??fullDetails.overtimePay,
+    weekdayHours:bottomDetails.weekdayHours||fullDetails.weekdayHours,
+    weekendHours:bottomDetails.weekendHours||fullDetails.weekendHours,
+    vacationNet:fullDetails.vacationNet,
+    vacationDays:fullDetails.vacationDays
+  };
   let monthly=valuesNear(t,'månadslön',20000,100000)[0]||31700;
   let decimals=[...t.matchAll(/\b(\d{2,3}[,.]\d{2})\b/g)].map(x=>num(x[1]));
   let deduction=decimals.find(x=>x>182&&x<190)||183.67,sick=decimals.find(x=>x>140&&x<155)||146.93;
-  let hour=decimals.find(x=>x>175&&x<183)||181.14,vacationPay=decimals.find(x=>x>1500&&x<1900)||1681.56,vacationDeduction=decimals.find(x=>x>1300&&x<1500)||1432.44;
+  let hour=decimals.find(x=>x>175&&x<183)||monthly/175,vacationPay=decimals.find(x=>x>1500&&x<1900)||monthly*.054,vacationDeduction=decimals.find(x=>x>1300&&x<1500)||monthly*.046;
   let note=t.match(/ny lön[^0-9]*(?:från[^0-9]*)?(\d{1,2})[^a-zåäö0-9]+(januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)[^0-9]*(\d{5})/i)||[];
   let daily=[...new Set(decimals.filter(x=>x>900&&x<1200).map(x=>x.toFixed(2)))].map(Number),hasChange=note[3]||daily.length>1;
   if(note[3])monthly=+note[3];else if(daily.length>1)monthly=Math.round(Math.max(...daily)*31/10)*10;
@@ -290,12 +302,15 @@ $('calculate').onclick=()=>{
   let otPay=data.reduce((s,d)=>s+d.plus/60*hourRate*([0,6].includes(d.date.getDay())?2:1.5),0),minusPay=minusMin/60*hourRate,sickDeduction=sickMin/60*dedRate,sickPay=sickMin/60*sickRate;
   let sickDays=data.filter(d=>d.sick>0).sort((a,b)=>a.date-b.date),periods=[],last=null;sickDays.forEach(d=>{if(!last||(d.date-last)/86400000>5)periods.push([]);periods.at(-1).push(d);last=d.date});
   let weeklyCap=(calibratedPeriod?7.97:(39.83/5))*sickRate,waitingPay=periods.reduce((sum,p)=>sum+Math.min(weeklyCap,p.reduce((s,d)=>s+d.sick/60*sickRate,0)),0);
-  let vacationDays=data.reduce((s,d)=>s+d.vacation,0),vacationNet=vacationDays*(vacPay-vacDed);
+  let vacationDays=data.reduce((s,d)=>s+d.vacation,0);
+  if(verifiedPayslipDetails?.vacationDays>0)vacationDays=verifiedPayslipDetails.vacationDays;
+  let vacationNet=vacationDays*(vacPay-vacDed);
   if(verifiedPayslipDetails){
-    if(verifiedPayslipDetails.overtimePay!==null)otPay=verifiedPayslipDetails.overtimePay;
-    if(verifiedPayslipDetails.weekdayHours>0)weekdayPlusMin=Math.round(verifiedPayslipDetails.weekdayHours*60);
-    if(verifiedPayslipDetails.weekendHours>0)weekendPlusMin=Math.round(verifiedPayslipDetails.weekendHours*60);
-    if(verifiedPayslipDetails.vacationNet!==null)vacationNet=verifiedPayslipDetails.vacationNet;
+    if(verifiedPayslipDetails.weekdayHours>0||verifiedPayslipDetails.weekendHours>0){
+      weekdayPlusMin=Math.round(verifiedPayslipDetails.weekdayHours*60);
+      weekendPlusMin=Math.round(verifiedPayslipDetails.weekendHours*60);
+      otPay=verifiedPayslipDetails.weekdayHours*hourRate*1.5+verifiedPayslipDetails.weekendHours*hourRate*2;
+    }else if(verifiedPayslipDetails.overtimePay!==null)otPay=verifiedPayslipDetails.overtimePay;
   }
   let sorted=data.map(d=>d.date).sort((a,b)=>a-b),start=sorted[0]||change,end=new Date(start.getFullYear(),start.getMonth()+1,start.getDate()-1),base=0;
   for(let d=new Date(start);d<=end;d.setDate(d.getDate()+1)){let daysInMonth=new Date(d.getFullYear(),d.getMonth()+1,0).getDate(),salary=d<change?oldMonthly:monthly;base+=salary/daysInMonth}
