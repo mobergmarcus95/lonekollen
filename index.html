@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#090909">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <link rel="manifest" href="manifest.webmanifest">
   <title>Lönekollen – sjuklön, övertid och minustid</title>
   <style>
@@ -21,12 +22,13 @@
   </style>
 </head>
 <body><main>
-  <header class="hero"><div class="logo">SEK</div><div class="hero-copy"><h1>Lönekollen</h1><p class="muted">Från lönespecifikation och tider till en tydlig löneöversikt.</p><span class="version">Röda dagar 2026-07-18</span></div></header>
+  <header class="hero"><div class="logo">SEK</div><div class="hero-copy"><h1>Lönekollen</h1><p class="muted">Från lönespecifikation och tider till en tydlig löneöversikt.</p><span class="version">FLERVAL 2026-07-19</span></div></header>
 
   <section class="card">
     <h2>Ladda upp bilder</h2>
     <label>Lönespecifikation</label><input id="payslip" type="file" accept="image/*">
-    <label>Kalenderbilder</label><input id="calendar" type="file" accept="image/*" multiple>
+    <label>Kalenderbilder</label><input id="calendar" name="calendar[]" type="file" accept="image/*" multiple="multiple">
+    <div id="calendarSelection" class="status muted">Markera alla kalenderbilder i samma bildväljare.</div>
     <label>Avvikelser (frivilligt)</label><textarea id="exceptions" rows="3" placeholder="Exempel: obetald semesterdag 2st, semesterersättning 1 500 kr eller extra skatt 500 kr"></textarea>
     <button id="read">Räkna</button>
     <div id="status" class="status muted"></div>
@@ -89,6 +91,12 @@
 <script>
 const $=id=>document.getElementById(id), months={januari:0,februari:1,mars:2,april:3,maj:4,juni:5,juli:6,augusti:7,september:8,oktober:9,november:10,december:11};
 const money=n=>Number(n||0).toLocaleString('sv-SE',{style:'currency',currency:'SEK'});
+$('calendar').multiple=true;
+$('calendar').setAttribute('multiple','multiple');
+$('calendar').addEventListener('change',()=>{
+  const count=$('calendar').files.length;
+  $('calendarSelection').textContent=count?`${count} kalenderbild${count===1?'':'er'} markerade.`:'Inga kalenderbilder markerade.';
+});
 let verifiedPayslipTotals=null;
 let verifiedPayslipDetails=null;
 let expectedPayPeriod=null;
