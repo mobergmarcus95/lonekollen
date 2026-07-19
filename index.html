@@ -283,10 +283,21 @@ function redShape(canvas,x0,y0,x1,y1){
 function colourType(canvas,box,scale=1){
   let c=canvas.getContext('2d'),x0=Math.max(0,box.x0-210*scale),x1=Math.min(canvas.width,box.x1+25*scale),y0=Math.max(0,box.y0-105*scale),y1=Math.min(canvas.height,box.y1+12*scale),p=c.getImageData(x0,y0,x1-x0,y1-y0).data,g=0,r=0,o=0,ox0=x1-x0,ox1=-1,oy0=y1-y0,oy1=-1,w=x1-x0;
   for(let i=0;i<p.length;i+=4){let R=p[i],G=p[i+1],B=p[i+2],px=(i/4)%w,py=Math.floor((i/4)/w);if(G>95&&G>R*1.2&&G>B*1.12)g++;if(R>145&&R>G*1.3&&R>B*1.2)r++;if(R>150&&G>65&&G<155&&B<70&&R>G*1.25){o++;ox0=Math.min(ox0,px);ox1=Math.max(ox1,px);oy0=Math.min(oy0,py);oy1=Math.max(oy1,py)}}
-  if(o>18){let ow=ox1-ox0+1,oh=oy1-oy0+1;return ow/Math.max(1,oh)>.82?'vacation':'paidleave'}
+  if(o>18){let ow=ox1-ox0+1,oh=oy1-oy0+1;return ow/Math.max(1,oh)>.965?'vacation':'paidleave'}
   if(g>18&&g>r*1.15)return 'plus';
   if(r>12){let shape=redShape(canvas,x0,y0,x1,y1);return shape.height>34&&shape.width>18?'sick':'minus'}
   return 'normal';
+}
+function rowOrangeType(canvas,y0,y1){
+  const ctx=canvas.getContext('2d'),x0=Math.floor(canvas.width*.52),x1=canvas.width,w=Math.max(1,x1-x0),h=Math.max(1,Math.floor(y1-y0)),pixels=ctx.getImageData(x0,Math.max(0,Math.floor(y0)),w,h).data;
+  let count=0,minX=w,minY=h,maxX=-1,maxY=-1;
+  for(let i=0;i<pixels.length;i+=4){
+    const R=pixels[i],G=pixels[i+1],B=pixels[i+2],x=(i/4)%w,y=Math.floor((i/4)/w);
+    if(R>145&&G>55&&G<175&&B<95&&R>G*1.18){count++;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y)}
+  }
+  if(count<20||maxX<0)return null;
+  const width=maxX-minX+1,height=maxY-minY+1;
+  return width/Math.max(1,height)>.965?'vacation':'paidleave';
 }
 function ocrDay(value){
   const fixed=String(value||'').toLowerCase().replace(/[o]/g,'0').replace(/[il]/g,'1').replace(/b/g,'8').replace(/s/g,'5').replace(/g/g,'6');
@@ -345,8 +356,37 @@ async function readCalendar(file){
     let box={x0:words[i].bbox.x0,y0:Math.min(words[i].bbox.y0-5,words[end].bbox.y0-5),x1:words[end].bbox.x1,y1:Math.max(words[i].bbox.y1,words[end].bbox.y1)};
     durations.push({mins,y:box.y0,type:colourType(canvas,box,scale)});i=end;
   }
-  let out=[];for(let j=0;j<dateWords.length;j++){let dt=dateWords[j],next=dateWords[j+1]?.y??canvas.height,vals=durations.filter(x=>x.y>dt.y+35*scale&&x.y<next);let row={day:dt.day,month:dt.month,normal:0,plus:0,minus:0,sick:0,vacation:0,paidleave:0,covered:true};vals.forEach(v=>row[v.type]+=v.mins);out.push(row)}
-  return mergeDays([out,...textPasses]);
+  let out=[];for(let j=0;j<dateWords.length;j++){
+    let dt=dateWords[j],next=dateWords[j+1]?.y??canvas.height,vals=durations.filter(x=>x.y>dt.y+20*scale&&x.y<next),row={day:dt.day,month:dt.month,normal:0,plus:0,minus:0,sick:0,vacation:0,paidleave:0,covered:true};vals.forEach(v=>row[v.type]+=v.mins);
+    const date=periodDate(dt.month,dt.day),weekday=date.getDay(),scheduled=weekday===0||weekday===6?0:(weekday===5?350:510),orangeType=rowOrangeType(canvas,dt.y,next);
+    if(orangeType){
+      // En orange kalender-/palmikon betyder heldagsfrånvaro. OCR kan annars
+      // feltolka delar av ikonen eller "8 h 30 m" som 30/480 minuter och övertid.
+      row.normal=0;row.plus=0;row.minus=0;row.sick=0;row.vacation=0;row.paidleave=0;
+      if(scheduled)row[orangeType]=scheduled;
+    }
+    out.push(row);
+  }
+  const merged=mergeDays([out,...textPasses]);
+  // Textpasset hjälper oss hitta datum, men får inte skriva över säkert
+  // identifierade semester-/frånvaroikoner med falsk plus- eller minustid.
+  for(const visual of out){
+    const orangeType=visual.vacation?'vacation':visual.paidleave?'paidleave':null;
+    if(!orangeType)continue;
+    const row=merged.find(x=>x.day===visual.day&&x.month===visual.month);
+    if(!row)continue;
+    row.normal=0;row.plus=0;row.minus=0;row.sick=0;row.vacation=0;row.paidleave=0;
+    row[orangeType]=visual[orangeType];
+  }
+  // Helgrader utan arbetssymbol är tomma. OCR kan läsa det röda datumet
+  // (t.ex. 29) som en minutsiffra; det får aldrig bli en semesterdag.
+  for(const row of merged){
+    const date=periodDate(row.month,row.day),weekend=date.getDay()===0||date.getDay()===6;
+    if(weekend&&!row.plus&&!row.sick){
+      row.normal=0;row.minus=0;row.vacation=0;row.paidleave=0;
+    }
+  }
+  return merged;
 }
 function mergeDays(all){let map={};all.flat().forEach(x=>{let k=`${x.month}-${x.day}`,d=map[k]??={...x,normal:0,plus:0,minus:0,sick:0,vacation:0,paidleave:0,covered:false};for(let p of ['normal','plus','minus','sick','vacation','paidleave'])d[p]=Math.max(d[p],x[p]||0);d.covered=!!(d.covered||x.covered);map[k]=d});return Object.values(map).sort((a,b)=>a.month-b.month||a.day-b.day)}
 function addRow(d){
