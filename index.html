@@ -16,7 +16,7 @@
     input::placeholder,textarea::placeholder{color:#a59b93}input:focus,select:focus,textarea:focus{outline:0;border-color:var(--orange);box-shadow:0 0 0 4px #f9731618}input[type=file]{padding:9px;background:#fff}input[type=file]::file-selector-button{border:0;border-radius:10px;background:var(--orange-soft);color:#c65308;font-weight:800;padding:11px 15px;margin-right:12px;cursor:pointer}textarea{resize:vertical;min-height:96px}
     button{border:1px solid var(--orange);background:linear-gradient(135deg,var(--orange-2),var(--orange));color:#fff;font-weight:900;cursor:pointer;margin-top:16px;box-shadow:0 9px 22px #f9731626}button:hover{transform:translateY(-1px);box-shadow:0 12px 28px #f9731635}button:disabled{opacity:.5;cursor:wait;transform:none}
     .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}.summary{display:grid;grid-template-columns:repeat(12,1fr);gap:13px}.metric{position:relative;grid-column:span 3;padding:17px;border:1px solid var(--line);border-radius:16px;background:#fff;color:var(--muted)}.metric b{display:block;font-size:21px;margin-top:7px;color:var(--ink);letter-spacing:-.03em}.metric.primary{grid-column:span 4;padding:21px;background:var(--panel-2);border-color:#f1d6c2}.metric.primary b{font-size:29px}.metric.net{background:linear-gradient(145deg,var(--orange-2),var(--orange));color:#fff;border-color:var(--orange)}.metric.net b{color:#fff}.metric.tax{color:var(--red)}.metric.tax b{color:var(--red)}.metric.hours{background:#fffaf6}.metric.holiday{overflow:hidden;border-color:#f2c7a7;background:#fff4ea;color:#c65308}.metric.holiday:after{content:"✦";position:absolute;right:13px;top:8px;color:var(--orange);font-size:25px;opacity:.7}.metric.holiday b{color:#c65308;font-size:25px}.metric.holiday small{display:block;margin-top:5px;color:#9a6847}.plus{color:var(--green-dark)}.minus{color:var(--red)}
-    .status{white-space:pre-wrap;margin-top:17px;padding:14px 15px;border:1px solid var(--line);border-radius:14px;background:#fffaf6;color:var(--muted)}.scroll{overflow:auto;border:1px solid var(--line);border-radius:16px}table{width:100%;border-collapse:collapse;min-width:760px;background:#fff}thead{background:#fff4ea}th,td{padding:12px 11px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#7f746b}tbody tr:last-child td{border-bottom:0}td input,td select{padding:8px;min-width:86px;background:#fff}.danger{background:#fff0f0}.sick{background:#fff5e9}.ok{background:#eef9f4}.holiday-row td:first-child{border-left:3px solid var(--orange);color:#c65308;font-weight:800}.hidden{display:none}code{background:#fff0e5;padding:2px 5px;border-radius:5px}
+    .file-note{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 2px 0;color:var(--muted);font-size:14px}.file-note button{width:auto;margin:0;padding:7px 11px;border-color:#ead4c3;background:#fff7f0;color:#c65308;box-shadow:none;font-size:13px}.status{white-space:pre-wrap;margin-top:17px;padding:14px 15px;border:1px solid var(--line);border-radius:14px;background:#fffaf6;color:var(--muted)}.scroll{overflow:auto;border:1px solid var(--line);border-radius:16px}table{width:100%;border-collapse:collapse;min-width:760px;background:#fff}thead{background:#fff4ea}th,td{padding:12px 11px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#7f746b}tbody tr:last-child td{border-bottom:0}td input,td select{padding:8px;min-width:86px;background:#fff}.danger{background:#fff0f0}.sick{background:#fff5e9}.ok{background:#eef9f4}.holiday-row td:first-child{border-left:3px solid var(--orange);color:#c65308;font-weight:800}.hidden{display:none}code{background:#fff0e5;padding:2px 5px;border-radius:5px}
     @media(max-width:760px){main{padding:24px 13px 48px}.card{padding:21px;border-radius:22px}.hero{align-items:flex-start}.logo{width:52px;height:52px;border-radius:17px}.metric,.metric.primary{grid-column:span 6}.metric.primary:last-of-type{grid-column:span 12}.metric.primary b{font-size:25px}}
   </style>
 </head>
@@ -27,6 +27,7 @@
     <h2>Ladda upp bilder</h2>
     <label>Lönespecifikation</label><input id="payslip" type="file" accept="image/*">
     <label>Kalenderbilder</label><input id="calendar" type="file" accept="image/*" multiple>
+    <div class="file-note"><span id="calendarCount">Inga bilder valda</span><button id="clearCalendar" type="button" class="hidden">Töm bilder</button></div>
     <label>Avvikelser (frivilligt)</label><textarea id="exceptions" rows="3" placeholder="Exempel: obetald semesterdag 2st, semesterersättning 1 500 kr eller extra skatt 500 kr"></textarea>
     <button id="read">Räkna</button>
     <div id="status" class="status muted"></div>
@@ -93,6 +94,7 @@ let verifiedPayslipTotals=null;
 let verifiedPayslipDetails=null;
 let expectedPayPeriod=null;
 let tesseractLoader;
+let selectedCalendarFiles=[];
 function ensureTesseract(){
   if(window.Tesseract)return Promise.resolve(window.Tesseract);
   if(tesseractLoader)return tesseractLoader;
@@ -452,8 +454,24 @@ function deviationValues(text,hourRate,vacationDeduction,grossBefore){
   return {gross,extraTax};
 }
 
+$('calendar').addEventListener('change',event=>{
+  const incoming=[...event.target.files];
+  for(const file of incoming){
+    const key=`${file.name}|${file.size}|${file.lastModified}`;
+    if(!selectedCalendarFiles.some(existing=>`${existing.name}|${existing.size}|${existing.lastModified}`===key))selectedCalendarFiles.push(file);
+  }
+  $('calendarCount').textContent=selectedCalendarFiles.length?`${selectedCalendarFiles.length} kalenderbild${selectedCalendarFiles.length===1?'':'er'} valda – du kan lägga till fler`:'Inga bilder valda';
+  $('clearCalendar').classList.toggle('hidden',!selectedCalendarFiles.length);
+  event.target.value='';
+});
+$('clearCalendar').onclick=()=>{
+  selectedCalendarFiles=[];
+  $('calendar').value='';
+  $('calendarCount').textContent='Inga bilder valda';
+  $('clearCalendar').classList.add('hidden');
+};
 $('read').onclick=async()=>{
-  let p=$('payslip').files[0],files=[...$('calendar').files];if(!p||!files.length){$('status').textContent='Välj både lönebeskedet och kalenderbilderna.';return}
+  let p=$('payslip').files[0],files=[...selectedCalendarFiles];if(!p||!files.length){$('status').textContent='Välj både lönebeskedet och kalenderbilderna.';return}
   $('read').disabled=true;try{
     $('status').textContent='Läser lönebeskedet…';let pay=await readPayslip(p);verifiedPayslipTotals=pay.verifiedTotals;verifiedPayslipDetails=pay.details;expectedPayPeriod=pay.period;for(let [id,v] of Object.entries({monthly:pay.monthly,oldMonthly:pay.oldMonthly,salaryChange:pay.change,hourRate:pay.hour,deductionRate:pay.deduction,sickRate:pay.sick,vacationPay:pay.vacationPay,vacationDeduction:pay.vacationDeduction,bonus:pay.bonus,tax:pay.tax,year:pay.year}))$(id).value=v;
     if(!expectedPayPeriod){$('status').textContent='Löneperioden kunde inte läsas säkert från lönespecifikationen. Ingen beräkning visas. Ta en rak och skarp bild där hela löneperioden syns.';$('resultCard').classList.add('hidden');return}
