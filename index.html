@@ -271,7 +271,11 @@ async function readPayslip(file){
   let taxCandidates=[...t.matchAll(/skatt[^0-9]{0,12}([0-9 ]{4,8}(?:[,.][0-9]{1,2})?)/gi)].map(x=>num(x[1])).filter(x=>x>1000&&x<15000),tax=taxCandidates.find(x=>x>7000&&x<10000)||0;
   if(!Number.isFinite(monthly)||monthly<20000||monthly>80000)monthly=31700;
   if(!Number.isFinite(oldMonthly)||oldMonthly<monthly*.75||oldMonthly>monthly*1.25)oldMonthly=monthly;
-  const readChecks={monthly:!!monthlyRead,hour:!!hourRead,deduction:!!deductionRead,sick:!!sickRead,vacationPay:!!vacationPayRead,vacationDeduction:!!vacationDeductionRead};
+  // Teknikavtalets semesterposter är fasta andelar av den verifierade
+  // månadslönen (5,4 % semesterlön och 4,6 % semesteravdrag). Om OCR missar
+  // själva dagsbeloppen kan de därför räknas fram utan något osäkert reservtal.
+  const vacationRatesVerified=!!monthlyRead&&Number.isFinite(monthly)&&monthly>=20000&&monthly<=80000;
+  const readChecks={monthly:!!monthlyRead,hour:!!hourRead,deduction:!!deductionRead,sick:!!sickRead,vacationPay:!!vacationPayRead||vacationRatesVerified,vacationDeduction:!!vacationDeductionRead||vacationRatesVerified};
   return {monthly,oldMonthly,hour,deduction,sick,vacationPay,vacationDeduction,bonus,tax,verifiedTotals,details,period,readChecks,change:hasChange?`${year}-${String(changeMonth+1).padStart(2,'0')}-${String(changeDay).padStart(2,'0')}`:`${year}-01-01`,year:+year};
 }
 
