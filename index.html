@@ -27,6 +27,8 @@
     <h2>Ladda upp bilder</h2>
     <label>Lönespecifikation</label><input id="payslip" type="file" accept="image/*">
     <label>Kalenderbilder</label><input id="calendar" type="file" accept="image/*" multiple>
+    <div id="calendarCount" class="status muted">Inga kalenderbilder valda. Du kan välja en bild i taget och sedan trycka Välj filer igen.</div>
+    <button id="clearCalendar" type="button" style="display:none;background:#2b2926;color:#eee;margin-top:8px;padding:10px">Rensa kalenderbilder</button>
     <label>Avvikelser (frivilligt)</label><textarea id="exceptions" rows="3" placeholder="Exempel: obetald semesterdag 2st, semesterersättning 1 500 kr eller extra skatt 500 kr"></textarea>
     <button id="read">Räkna</button>
     <div id="status" class="status muted"></div>
@@ -411,8 +413,21 @@ function deviationValues(text,hourRate,vacationDeduction,grossBefore){
   return {gross,extraTax};
 }
 
+let calendarFiles=[];
+$('calendar').addEventListener('change',event=>{
+  for(const file of [...event.target.files]){
+    const key=`${file.name}|${file.size}|${file.lastModified}`;
+    if(!calendarFiles.some(existing=>`${existing.name}|${existing.size}|${existing.lastModified}`===key))calendarFiles.push(file);
+  }
+  $('calendarCount').textContent=calendarFiles.length?`${calendarFiles.length} kalenderbild${calendarFiles.length===1?'':'er'} valda. Tryck Välj filer igen för att lägga till fler.`:'Inga kalenderbilder valda.';
+  $('clearCalendar').style.display=calendarFiles.length?'block':'none';
+  event.target.value='';
+});
+$('clearCalendar').onclick=()=>{
+  calendarFiles=[];$('calendar').value='';$('calendarCount').textContent='Inga kalenderbilder valda. Du kan välja en bild i taget och sedan trycka Välj filer igen.';$('clearCalendar').style.display='none';
+};
 $('read').onclick=async()=>{
-  let p=$('payslip').files[0],files=[...$('calendar').files];if(!p||!files.length){$('status').textContent='Välj både lönebeskedet och kalenderbilderna.';return}
+  let p=$('payslip').files[0],files=[...calendarFiles];if(!p||!files.length){$('status').textContent='Välj både lönebeskedet och kalenderbilderna.';return}
   $('read').disabled=true;try{
     $('status').textContent='Läser lönebeskedet…';let pay=await readPayslip(p);verifiedPayslipTotals=pay.verifiedTotals;verifiedPayslipDetails=pay.details;expectedPayPeriod=pay.period;for(let [id,v] of Object.entries({monthly:pay.monthly,oldMonthly:pay.oldMonthly,salaryChange:pay.change,hourRate:pay.hour,deductionRate:pay.deduction,sickRate:pay.sick,vacationPay:pay.vacationPay,vacationDeduction:pay.vacationDeduction,bonus:pay.bonus,tax:pay.tax,year:pay.year}))$(id).value=v;
     if(!expectedPayPeriod){$('status').textContent='Löneperioden kunde inte läsas säkert från lönespecifikationen. Ingen beräkning visas. Ta en rak och skarp bild där hela löneperioden syns.';$('resultCard').classList.add('hidden');return}
