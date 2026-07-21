@@ -329,7 +329,7 @@ function rowOrangeType(canvas,y0,y1){
   return width/Math.max(1,height)>.965?'vacation':'paidleave';
 }
 function ocrDay(value){
-  const fixed=String(value||'').toLowerCase().replace(/[o]/g,'0').replace(/[il]/g,'1').replace(/b/g,'8').replace(/s/g,'5').replace(/g/g,'6');
+  const fixed=String(value||'').toLowerCase().replace(/[o]/g,'0').replace(/[il]/g,'1').replace(/b/g,'8').replace(/s/g,'5').replace(/g/g,'9');
   const day=Number(fixed);return Number.isInteger(day)&&day>=1&&day<=31?day:null;
 }
 function readCalendarText(text,year){
@@ -382,6 +382,22 @@ async function readCalendar(file){
         inferred.push({day:date.getDate(),month:date.getMonth(),y:a.y+vertical*step/gap,inferred:true});
       }
     }
+  }
+  // De två översta kalenderkorten kan ligga nära flikarna och OCR missar då
+  // ibland båda datumen, trots att tiderna syns. Hitta första säkra paret av
+  // efterföljande dagar och bygg bakåt med samma radavstånd, men aldrig upp i
+  // sidhuvudet. Det fångar t.ex. 8–9 mars när 10–11 mars lästs korrekt.
+  const visibleDated=dated.filter(x=>x.y>canvas.height*.2);
+  for(let i=0;i<visibleDated.length-1;i++){
+    const a=visibleDated[i],b=visibleDated[i+1],gap=Math.round((b.date-a.date)/86400000),rowStep=b.y-a.y;
+    if(gap!==1||rowStep<=90*scale||rowStep>=900*scale)continue;
+    for(let step=1;step<=5;step++){
+      const y=a.y-rowStep*step;if(y<=canvas.height*.2)break;
+      const date=new Date(a.date);date.setDate(date.getDate()-step);
+      const day=date.getDate(),month=date.getMonth();
+      if(!dateWords.some(x=>x.day===day&&x.month===month)&&!inferred.some(x=>x.day===day&&x.month===month))inferred.push({day,month,y,inferred:true});
+    }
+    break;
   }
   dateWords=[...dateWords,...inferred].sort((a,b)=>a.y-b.y);
   let durations=[];
