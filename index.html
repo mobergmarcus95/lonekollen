@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#fffaf5">
+  <meta name="theme-color" content="#4d5b31">
   <link rel="manifest" href="manifest.webmanifest">
   <title>Lönekollen – sjuklön, övertid och minustid</title>
   <style>
@@ -18,18 +18,36 @@
     .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}.summary{display:grid;grid-template-columns:repeat(12,1fr);gap:13px}.metric{position:relative;grid-column:span 3;padding:17px;border:1px solid var(--line);border-radius:16px;background:#fff;color:var(--muted)}.metric b{display:block;font-size:21px;margin-top:7px;color:var(--ink);letter-spacing:-.03em}.metric.primary{grid-column:span 4;padding:21px;background:var(--panel-2);border-color:#f1d6c2}.metric.primary b{font-size:29px}.metric.net{background:linear-gradient(145deg,var(--orange-2),var(--orange));color:#fff;border-color:var(--orange)}.metric.net b{color:#fff}.metric.tax{color:var(--red)}.metric.tax b{color:var(--red)}.metric.hours{background:#fffaf6}.metric.holiday{overflow:hidden;border-color:#f2c7a7;background:#fff4ea;color:#c65308}.metric.holiday:after{content:"✦";position:absolute;right:13px;top:8px;color:var(--orange);font-size:25px;opacity:.7}.metric.holiday b{color:#c65308;font-size:25px}.metric.holiday small{display:block;margin-top:5px;color:#9a6847}.plus{color:var(--green-dark)}.minus{color:var(--red)}
     .status{white-space:pre-wrap;margin-top:17px;padding:14px 15px;border:1px solid var(--line);border-radius:14px;background:#fffaf6;color:var(--muted)}.scroll{overflow:auto;border:1px solid var(--line);border-radius:16px}table{width:100%;border-collapse:collapse;min-width:760px;background:#fff}thead{background:#fff4ea}th,td{padding:12px 11px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#7f746b}tbody tr:last-child td{border-bottom:0}td input,td select{padding:8px;min-width:86px;background:#fff}.danger{background:#fff0f0}.sick{background:#fff5e9}.ok{background:#eef9f4}.holiday-row td:first-child{border-left:3px solid var(--orange);color:#c65308;font-weight:800}.hidden{display:none}code{background:#fff0e5;padding:2px 5px;border-radius:5px}
     @media(max-width:760px){main{padding:24px 13px 48px}.card{padding:21px;border-radius:22px}.hero{align-items:flex-start}.logo{width:52px;height:52px;border-radius:17px}.metric,.metric.primary{grid-column:span 6}.metric.primary:last-of-type{grid-column:span 12}.metric.primary b{font-size:25px}}
+  
+    /* Olivgrön mobil design */
+    :root{--orange:#4d5b31;--orange-2:#788655;--orange-soft:#edf0e3;--ink:#20251b;--muted:#6c7164;--bg:#f7f4ec;--panel:#fffdf8;--panel-2:#f8f8f1;--line:#dedfd6}
+    html{background:var(--bg)}body{background:radial-gradient(circle at 100% 0,rgba(120,134,85,.22),transparent 34rem),var(--bg);color:var(--ink)}
+    main{max-width:680px;padding:22px 16px 56px}.hero{margin:0 0 26px;padding:0;align-items:center}.logo{width:42px;height:42px;border-radius:13px 13px 13px 5px;background:var(--orange);font-size:11px;box-shadow:0 8px 18px rgba(77,91,49,.25)}.hero-copy h1{font:760 18px/1 system-ui,-apple-system,"Segoe UI",sans-serif;letter-spacing:-.025em}
+    .intro{margin:0 4px 23px}.eyebrow{margin:0;color:#d96b4d;font-size:12px;font-weight:800;letter-spacing:.11em;text-transform:uppercase}
+    .card{border:1px solid rgba(47,56,32,.08);border-radius:24px;background:rgba(255,253,248,.94);box-shadow:0 18px 45px rgba(47,56,32,.12)}
+    .upload-card{padding:8px;overflow:hidden}.step{padding:18px 16px}.step+.step{border-top:1px solid var(--line)}.step-head{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start}.step h2{margin:2px 0 4px;font-size:15px}.step p{margin:0;font-size:12px}.number{display:grid;width:26px;height:26px;place-items:center;border-radius:50%;color:#3d4928;background:#edf0e3;font-size:12px;font-weight:800}.optional{color:var(--muted);font-weight:500}
+    .upload-card input[type=file]{margin-top:13px;border:1px dashed #b9bea9;border-radius:15px;background:#f8f8f1}.upload-card input[type=file]::file-selector-button{background:#4d5b31;color:#fff}
+    .upload-card textarea{margin-top:13px;background:#fbfaf5;border-color:var(--line)}
+    .examples{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.example-chip{width:auto;margin:0;padding:4px 2px;border:0;border-radius:0;color:#2457d6;background:transparent;box-shadow:none;font-size:11px;font-weight:700;text-decoration:underline;text-underline-offset:3px}.example-chip:hover{color:#173b9b;background:transparent;box-shadow:none;transform:none}
+    .action-wrap{padding:8px}.action-wrap #read{min-height:58px;margin:0;border:0;border-radius:17px;background:#4d5b31;box-shadow:0 12px 25px rgba(77,91,49,.22)}.action-wrap .status:empty{display:none}
+    @media(max-width:760px){main{padding:18px 16px 48px}.card{padding:20px}.upload-card{padding:8px}.step{padding:18px 16px}}
   </style>
 </head>
 <body><main>
-  <header class="hero"><div class="logo">SEK</div><div class="hero-copy"><h1>Lönekollen</h1></div></header>
+  <header class="hero"><div class="logo">SEK</div><div class="hero-copy"><h1>Lönekollen</h1></div></header>\n  <section class="intro"><p class="eyebrow">Din lön, dubbelkollad</p></section>
 
-  <section class="card">
-    <h2>Ladda upp bilder</h2>
-    <label>Lönespecifikation</label><input id="payslip" type="file" accept="image/*">
-    <label>Kalenderbilder</label><input id="calendar" type="file" accept="image/*" multiple>
-    <label>Avvikelser (frivilligt)</label><textarea id="exceptions" rows="3" placeholder="Exempel: obetald semesterdag 2st, semesterersättning 1 500 kr eller extra skatt 500 kr"></textarea>
-    <button id="read">Räkna</button>
-    <div id="status" class="status muted"></div>
+  <section class="card upload-card">
+    <div class="step"><div class="step-head"><span class="number">1</span><div><h2>Lönespecifikation</h2><p class="muted">En tydlig bild där lön och period syns.</p></div></div><input id="payslip" type="file" accept="image/*"></div>
+    <div class="step"><div class="step-head"><span class="number">2</span><div><h2>Kalenderbilder</h2><p class="muted">Välj en eller flera bilder från kalendern.</p></div></div><input id="calendar" type="file" accept="image/*" multiple></div>
+    <div class="step"><div class="step-head"><span class="number">3</span><div><h2>Avvikelser <span class="optional">(frivilligt)</span></h2><p class="muted">Skriv sådant som påverkar just den här löneperioden.</p></div></div>
+      <textarea id="exceptions" rows="3" placeholder="Ex. obetald semesterdag 1&#10;Semesterersättningen utbetald&#10;Extra skatteavdrag 1 000 kr"></textarea>
+      <div class="examples">
+        <button class="example-chip" type="button" data-example="Obetald semesterdag 1">+ Obetald semesterdag</button>
+        <button class="example-chip" type="button" data-example="Semesterersättningen utbetald">+ Semesterersättning utbetald</button>
+        <button class="example-chip" type="button" data-example="Extra skatteavdrag 1 000 kr">+ Extra skatteavdrag</button>
+      </div>
+    </div>
+    <div class="action-wrap"><button id="read">Kontrollera min lön →</button><div id="status" class="status muted"></div></div>
   </section>
 
   <section id="settingsCard" class="card hidden">
@@ -88,6 +106,7 @@
 </main>
 <script>
 const $=id=>document.getElementById(id), months={januari:0,februari:1,mars:2,april:3,maj:4,juni:5,juli:6,augusti:7,september:8,oktober:9,november:10,december:11};
+document.querySelectorAll('[data-example]').forEach(button=>button.addEventListener('click',()=>{const field=document.getElementById('exceptions');field.value=[field.value.trim(),button.dataset.example].filter(Boolean).join('\\n');field.dispatchEvent(new Event('input'));field.focus()}));
 const money=n=>Number(n||0).toLocaleString('sv-SE',{style:'currency',currency:'SEK'});
 let verifiedPayslipTotals=null;
 let verifiedPayslipDetails=null;
@@ -546,3 +565,4 @@ if('serviceWorker' in navigator){
   });
 }
 </script></body></html>
+
