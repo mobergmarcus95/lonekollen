@@ -28,15 +28,18 @@
     .upload-card{padding:8px;overflow:hidden}.step{padding:18px 16px}.step+.step{border-top:1px solid var(--line)}.step-head{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start}.step h2{margin:2px 0 4px;font-size:15px}.step p{margin:0;font-size:12px}.number{display:grid;width:26px;height:26px;place-items:center;border-radius:50%;color:#3d4928;background:#edf0e3;font-size:12px;font-weight:800}.optional{color:var(--muted);font-weight:500}
     .upload-card input[type=file]{margin-top:13px;border:1px dashed #b9bea9;border-radius:15px;background:#f8f8f1}.upload-card input[type=file]::file-selector-button{background:#4d5b31;color:#fff}
     .upload-card textarea{margin-top:13px;background:#fbfaf5;border-color:var(--line)}
+    .agreement-note{display:flex;align-items:flex-start;gap:10px;margin:6px 6px 0;padding:12px 13px;border:1px solid #dce2c9;border-radius:14px;background:#f3f5ea;color:#4d5b31;font-size:12px;line-height:1.4}.agreement-note strong{white-space:nowrap}.agreement-note span{color:var(--muted)}
     .examples{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}.example-chip{width:auto;margin:0;padding:4px 2px;border:0;border-radius:0;color:#2457d6;background:transparent;box-shadow:none;font-size:11px;font-weight:700;text-decoration:underline;text-underline-offset:3px}.example-chip:hover{color:#173b9b;background:transparent;box-shadow:none;transform:none}
     .action-wrap{padding:8px}.action-wrap #read{min-height:58px;margin:0;border:0;border-radius:17px;background:#4d5b31;box-shadow:0 12px 25px rgba(77,91,49,.22)}.action-wrap .status:empty{display:none}
     @media(max-width:760px){main{padding:18px 16px 48px}.card{padding:20px}.upload-card{padding:8px}.step{padding:18px 16px}}
   </style>
 </head>
 <body><main>
-  <header class="hero"><div class="logo">SEK</div><div class="hero-copy"><h1>Lönekollen</h1></div></header>\n  <section class="intro"><p class="eyebrow">Din lön, dubbelkollad</p></section>
+  <header class="hero"><div class="logo">SEK</div><div class="hero-copy"><h1>Lönekollen</h1></div></header>
+  <section class="intro"><p class="eyebrow">Din lön, dubbelkollad</p></section>
 
   <section class="card upload-card">
+    <div class="agreement-note"><strong>SWEMEK · 2025-nivå</strong><span>2026 års nya lön läggs inte på automatiskt.</span></div>
     <div class="step"><div class="step-head"><span class="number">1</span><div><h2>Lönespecifikation</h2><p class="muted">En tydlig bild där lön och period syns.</p></div></div><input id="payslip" type="file" accept="image/*"></div>
     <div class="step"><div class="step-head"><span class="number">2</span><div><h2>Kalenderbilder</h2><p class="muted">Välj en eller flera bilder från kalendern.</p></div></div><input id="calendar" type="file" accept="image/*" multiple></div>
     <div class="step"><div class="step-head"><span class="number">3</span><div><h2>Avvikelser <span class="optional">(frivilligt)</span></h2><p class="muted">Skriv sådant som påverkar just den här löneperioden.</p></div></div>
@@ -56,7 +59,7 @@
       <div><label>Månadslön</label><input id="monthly" type="number" step="0.01"></div>
       <div><label>Tidigare månadslön</label><input id="oldMonthly" type="number" step="0.01"></div>
       <div><label>Löneändring från datum</label><input id="salaryChange" type="date"></div>
-      <div><label>Timvärde för plus/minus</label><input id="hourRate" type="number" step="0.01"></div>
+      <div><label>Timlön enligt månadslön ÷ 175</label><input id="hourRate" type="number" step="0.01"></div>
       <div><label>Timvärde för sjukavdrag</label><input id="deductionRate" type="number" step="0.01"></div>
       <div><label>Sjuklön per timme (80 %)</label><input id="sickRate" type="number" step="0.01"></div>
       <div><label>Semesterlön per dag</label><input id="vacationPay" type="number" step="0.01"></div>
@@ -65,7 +68,7 @@
       <div><label>Preliminär skatt</label><input id="tax" type="number" step="0.01" value="0"></div>
       <div><label>År</label><input id="year" type="number"></div>
     </div>
-    <p class="muted">För specifikationen du skickade är kontrollvärdena: tidigare lön 31 140 kr, ny lön 31 700 kr från 1 juni, timvärde 181,14 kr, sjukavdrag 183,67 kr och sjuklön 146,93 kr.</p>
+    <p class="muted">Beräkningen använder den månadslön som faktiskt läses från lönespecifikationen. Ingen generell löneökning för 2026 läggs till av systemet.</p>
   </section>
 
   <section id="daysCard" class="card hidden">
@@ -83,7 +86,7 @@
       <div class="metric holiday">Röda dagar<b id="redDayCount">–</b><small id="redDayDetails">i löneperioden</small></div>
       <div class="metric hours">Vardagsövertid<b id="weekdayHours">–</b></div>
       <div class="metric hours">Helg/röd dag<b id="weekendHours">–</b></div>
-      <div class="metric plus">Plus/OB-ersättning<b id="otPay">–</b></div>
+      <div class="metric plus">Övertidsersättning · SWEMEK<b id="otPay">–</b></div>
       <div class="metric minus">Minustidsavdrag<b id="minusPay">–</b></div>
       <div class="metric minus">Sjukavdrag<b id="sickDeduction">–</b></div>
       <div class="metric plus">Sjuklön 80 %<b id="sickPay">–</b></div>
@@ -106,8 +109,9 @@
 </main>
 <script>
 const $=id=>document.getElementById(id), months={januari:0,februari:1,mars:2,april:3,maj:4,juni:5,juli:6,augusti:7,september:8,oktober:9,november:10,december:11};
-document.querySelectorAll('[data-example]').forEach(button=>button.addEventListener('click',()=>{const field=document.getElementById('exceptions');field.value=[field.value.trim(),button.dataset.example].filter(Boolean).join('\\n');field.dispatchEvent(new Event('input'));field.focus()}));
+document.querySelectorAll('[data-example]').forEach(button=>button.addEventListener('click',()=>{const field=document.getElementById('exceptions');field.value=[field.value.trim(),button.dataset.example].filter(Boolean).join('\n');field.dispatchEvent(new Event('input'));field.focus()}));
 const money=n=>Number(n||0).toLocaleString('sv-SE',{style:'currency',currency:'SEK'});
+const SWEMEK=Object.freeze({level:'2025',hourDivisor:175,weeklyHours:2390/60,overtime:Object.freeze({weekday:93.62,workFreeWeekday:114.06,weekend:154.60})});
 let verifiedPayslipTotals=null;
 let verifiedPayslipDetails=null;
 let expectedPayPeriod=null;
@@ -274,27 +278,26 @@ async function readPayslip(file){
     vacationDays:fullDetails.vacationDays
   };
   const monthlyRead=valuesNear(t,'månadslön',20000,100000)[0]||null;
-  let monthly=monthlyRead||31700;
+  let monthly=monthlyRead||0;
   let decimals=[...t.matchAll(/\b(\d{2,3}[,.]\d{2})\b/g)].map(x=>num(x[1]));
   const closest=(target,tolerance)=>decimals.filter(x=>Math.abs(x-target)<=tolerance).sort((a,b)=>Math.abs(a-target)-Math.abs(b-target))[0]||null;
-  const expectedHour=monthly/175,expectedDeduction=monthly*12/(52*39.83),expectedSick=expectedDeduction*.8,expectedVacationPay=monthly*.054,expectedVacationDeduction=monthly*.046;
-  const hourRead=closest(expectedHour,Math.max(1.5,expectedHour*.015)),deductionRead=closest(expectedDeduction,Math.max(1.5,expectedDeduction*.015)),sickRead=closest(expectedSick,Math.max(1.5,expectedSick*.015));
-  const vacationPayRead=closest(expectedVacationPay,Math.max(8,expectedVacationPay*.012)),vacationDeductionRead=closest(expectedVacationDeduction,Math.max(8,expectedVacationDeduction*.012));
-  let deduction=deductionRead||expectedDeduction,sick=sickRead||expectedSick;
-  let hour=hourRead||expectedHour,vacationPay=vacationPayRead||expectedVacationPay,vacationDeduction=vacationDeductionRead||expectedVacationDeduction;
-  let note=t.match(/ny lön[^0-9]*(?:från[^0-9]*)?(\d{1,2})[^a-zåäö0-9]+(januari|februari|mars|april|maj|juni|juli|augusti|september|oktober|november|december)[^0-9]*(\d{5})/i)||[];
-  let daily=[...new Set(decimals.filter(x=>x>900&&x<1200).map(x=>x.toFixed(2)))].map(Number),hasChange=note[3]||daily.length>1;
-  if(note[3])monthly=+note[3];else if(daily.length>1)monthly=Math.round(Math.max(...daily)*31/10)*10;
-  let changeMonth=note[2]?months[note[2].toLowerCase()]:5,changeDay=note[1]?+note[1]:1,oldMonthly=hasChange&&daily.length?Math.round(Math.min(...daily)*31/10)*10:monthly;
+  // Månadslönen på den uppladdade lönespecifikationen är facit. Text om en
+  // kommande lönerevision får aldrig byta lönen som används i beräkningen.
+  const hasChange=false,changeMonth=0,changeDay=1,oldMonthly=monthly;
   let bonus=valuesNear(t,'bonus',0,10000).find(x=>x>0&&!(x>=2020&&x<=2035))||0;
   let taxCandidates=[...t.matchAll(/skatt[^0-9]{0,12}([0-9 ]{4,8}(?:[,.][0-9]{1,2})?)/gi)].map(x=>num(x[1])).filter(x=>x>1000&&x<15000),tax=taxCandidates.find(x=>x>7000&&x<10000)||0;
-  if(!Number.isFinite(monthly)||monthly<20000||monthly>80000)monthly=31700;
-  if(!Number.isFinite(oldMonthly)||oldMonthly<monthly*.75||oldMonthly>monthly*1.25)oldMonthly=monthly;
-  // Teknikavtalets semesterposter är fasta andelar av den verifierade
-  // månadslönen (5,4 % semesterlön och 4,6 % semesteravdrag). Om OCR missar
+  if(!Number.isFinite(monthly)||monthly<20000||monthly>80000)monthly=0;
+  // Avtalsvärdena räknas alltid från den verifierade månadslönen. OCR-värden
+  // används bara som kontroll och kan inte råka lägga på 2026 års lönenivå.
+  const expectedHour=monthly/SWEMEK.hourDivisor,expectedDeduction=monthly*12/(52*SWEMEK.weeklyHours),expectedSick=expectedDeduction*.8,expectedVacationPay=monthly*.054,expectedVacationDeduction=monthly*.046;
+  const hourRead=closest(expectedHour,Math.max(1.5,expectedHour*.015)),deductionRead=closest(expectedDeduction,Math.max(1.5,expectedDeduction*.015)),sickRead=closest(expectedSick,Math.max(1.5,expectedSick*.015));
+  const vacationPayRead=closest(expectedVacationPay,Math.max(8,expectedVacationPay*.012)),vacationDeductionRead=closest(expectedVacationDeduction,Math.max(8,expectedVacationDeduction*.012));
+  const hour=expectedHour,deduction=expectedDeduction,sick=expectedSick,vacationPay=expectedVacationPay,vacationDeduction=expectedVacationDeduction;
+  // SWEMEKs semesterposter är fasta andelar av den verifierade månadslönen:
+  // 4,6 % dagsvärde + 0,8 % tillägg = 5,4 %, samt 4,6 % semesteravdrag. Om OCR missar
   // själva dagsbeloppen kan de därför räknas fram utan något osäkert reservtal.
   const vacationRatesVerified=!!monthlyRead&&Number.isFinite(monthly)&&monthly>=20000&&monthly<=80000;
-  const readChecks={monthly:!!monthlyRead,hour:!!hourRead,deduction:!!deductionRead,sick:!!sickRead,vacationPay:!!vacationPayRead||vacationRatesVerified,vacationDeduction:!!vacationDeductionRead||vacationRatesVerified};
+  const readChecks={monthly:!!monthlyRead,hour:!!monthlyRead,deduction:!!monthlyRead,sick:!!monthlyRead,vacationPay:vacationRatesVerified,vacationDeduction:vacationRatesVerified};
   return {monthly,oldMonthly,hour,deduction,sick,vacationPay,vacationDeduction,bonus,tax,verifiedTotals,details,period,readChecks,change:hasChange?`${year}-${String(changeMonth+1).padStart(2,'0')}-${String(changeDay).padStart(2,'0')}`:`${year}-01-01`,year:+year};
 }
 
@@ -514,7 +517,7 @@ $('read').onclick=async()=>{
     if(needsSick&&(!pay.readChecks.deduction||!pay.readChecks.sick)){$('status').textContent='Sjukfrånvaro hittades, men sjukavdrag och sjuklön kunde inte verifieras på lönespecifikationen. Ingen osäker lön visas.';$('resultCard').classList.add('hidden');return}
     if(needsVacation&&(!pay.readChecks.vacationPay||!pay.readChecks.vacationDeduction)){$('status').textContent='Semester hittades, men semesterlön och semesteravdrag kunde inte verifieras på lönespecifikationen. Ingen osäker lön visas.';$('resultCard').classList.add('hidden');return}
     if($('rows').rows.length<8){$('status').textContent=`Bildläsningen hittade bara ${$('rows').rows.length} dagar och stoppades därför. Ingen felaktig lön visas. Prova samma bilder igen.`;$('resultCard').classList.add('hidden');return}
-    $('status').textContent=`Underlaget är komplett: hela löneperioden och nödvändiga lönevärden är verifierade. ${$('rows').rows.length} kalenderdagar finns i kontrolltabellen nedan.`;$('calculate').click();
+    $('status').textContent=`Underlaget är komplett. Beräkningen använder SWEMEK 2025-nivå och månadslönen ${money(pay.monthly)} som lästs från lönespecifikationen; 2026 års löneökning läggs inte till. ${$('rows').rows.length} kalenderdagar finns i kontrolltabellen nedan.`;$('calculate').click();
   }catch(e){$('status').textContent='Bildläsningen misslyckades: '+e.message+'\nKontrollera internetanslutningen och försök igen.'}finally{$('read').disabled=false}
 };
 $('calculate').onclick=()=>{
@@ -523,10 +526,12 @@ $('calculate').onclick=()=>{
   // På helg/röd dag är den faktiskt arbetade svarta tiden premiegrundande.
   // Röd schemabrist samma dag får inte dras en gång till från redan arbetad tid.
   let paidWeekdayMin=Math.max(0,weekdayPlusMin-weekdayMinusMin),paidWeekendMin=weekendPlusMin,remainingMinusMin=Math.max(0,weekdayMinusMin-weekdayPlusMin);
-  let payrollHourRate=Math.round(hourRate*100)/100,paidWeekdayHours=Math.round(paidWeekdayMin/60*100)/100,weekendHours=Math.round(paidWeekendMin/60*100)/100;
-  let otPay=paidWeekdayHours*payrollHourRate*1.5+weekendHours*payrollHourRate*2,minusPay=remainingMinusMin/60*hourRate,sickDeduction=sickMin/60*dedRate,sickPay=sickMin/60*sickRate;
+  let payrollHourRate=hourRate,paidWeekdayHours=paidWeekdayMin/60,weekendHours=paidWeekendMin/60;
+  // SWEMEK 2025: varje övertidstimme ger betalning för arbetad tid (månadslön/175)
+  // plus ett fast övertidstillägg. 2026 års högre tillägg används först när nivån aktiveras.
+  let weekdayOvertimePay=paidWeekdayHours*(payrollHourRate+SWEMEK.overtime.weekday),weekendOvertimePay=weekendHours*(payrollHourRate+SWEMEK.overtime.weekend),otPay=weekdayOvertimePay+weekendOvertimePay,minusPay=remainingMinusMin/60*hourRate,sickDeduction=sickMin/60*dedRate,sickPay=sickMin/60*sickRate;
   let sickDays=data.filter(d=>d.sick>0).sort((a,b)=>a.date-b.date),periods=[],last=null;sickDays.forEach(d=>{if(!last||(d.date-last)/86400000>5)periods.push([]);periods.at(-1).push(d);last=d.date});
-  let weeklyCap=(39.83/5)*sickRate,waitingPay=periods.reduce((sum,p)=>sum+Math.min(weeklyCap,p.reduce((s,d)=>s+d.sick/60*sickRate,0)),0);
+  let weeklyCap=(SWEMEK.weeklyHours/5)*sickRate,waitingPay=periods.reduce((sum,p)=>sum+Math.min(weeklyCap,p.reduce((s,d)=>s+d.sick/60*sickRate,0)),0);
   let vacationDays=data.reduce((s,d)=>s+d.vacation,0);
   let vacationNet=vacationDays*(vacPay-vacDed);
   let sorted=data.map(d=>d.date).sort((a,b)=>a-b),start=sorted[0]||change,end=new Date(start.getFullYear(),start.getMonth()+1,start.getDate()-1),base=monthly;
@@ -556,7 +561,7 @@ $('calculate').onclick=()=>{
     else{$(labelId).textContent=`Extra ${label.toLowerCase()}`;$(valueId).textContent=hm(-missing);$(valueId).parentElement.className='metric plus'}
   };
   showTimeDifference('weekdayDifferenceLabel','weekdayDifference',missingWeekday,'Vardagstid');showTimeDifference('weekendDifferenceLabel','weekendDifference',missingWeekend,'Helg/röd dag');
-  $('explanation').textContent=`Tidsrapporten är facit: vardag ${hm(weekdayPlusMin)} grönt minus ${hm(weekdayMinusMin)} rött = ${hm(paidWeekdayMin)}. Helg, röd dag och avtalsafton ${hm(paidWeekendMin)} faktiskt arbetat (svart eller grön tid). Röd schemabrist på en sådan dag dras inte från redan arbetad premietid. Vardagsminus dras aldrig från helgtid. Sjuk ${hm(sickMin)} · Semester ${vacationDays} dagar. Ersättningen följer ert lokala upplägg: grundtimlön + 50 % vardag och grundtimlön + 100 % helg/röd dag. ”Saknas” betyder att tidsrapportens självständiga beräkning är högre än det som står på lönespecen.`;$('resultCard').classList.remove('hidden');$('daysCard').parentNode.insertBefore($('resultCard'),$('daysCard'));$('resultCard').scrollIntoView({behavior:'smooth'});
+  $('explanation').textContent=`Tidsrapporten är facit: vardag ${hm(weekdayPlusMin)} grönt minus ${hm(weekdayMinusMin)} rött = ${hm(paidWeekdayMin)}. Helg, röd dag och avtalsafton ${hm(paidWeekendMin)} faktiskt arbetat (svart eller grön tid). Röd schemabrist på en sådan dag dras inte från redan arbetad övertid. Vardagsminus dras aldrig från helgtid. Sjuk ${hm(sickMin)} · Semester ${vacationDays} dagar. SWEMEK 2025-nivå används: arbetad övertid betalas med månadslön/175 plus 93,62 kr per vardagstimme eller 154,60 kr per timme på lördag, söndag, helgdag och avtalsafton. 2026 års nya lön läggs inte till automatiskt. ”Saknas” betyder att tidsrapportens självständiga beräkning är högre än det som står på lönespecen.`;$('resultCard').classList.remove('hidden');$('daysCard').parentNode.insertBefore($('resultCard'),$('daysCard'));$('resultCard').scrollIntoView({behavior:'smooth'});
 };
 $('exceptions').addEventListener('input',()=>{if(!$('resultCard').classList.contains('hidden'))$('calculate').click()});
 if('serviceWorker' in navigator){
@@ -565,4 +570,3 @@ if('serviceWorker' in navigator){
   });
 }
 </script></body></html>
-
